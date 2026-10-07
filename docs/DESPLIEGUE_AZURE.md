@@ -33,6 +33,14 @@ az login
 az extension add --name containerapp --upgrade
 az provider register --namespace Microsoft.App
 az provider register --namespace Microsoft.OperationalInsights
+az provider register --namespace Microsoft.ContainerRegistry
+az provider register --namespace Microsoft.Storage
+```
+
+El registro tarda uno o dos minutos. Comprueba que pone `Registered` antes de seguir:
+
+```powershell
+az provider show -n Microsoft.ContainerRegistry --query registrationState -o tsv
 ```
 
 ## 1. Variables
