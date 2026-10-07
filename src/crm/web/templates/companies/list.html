@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Empresas{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <h1 class="text-2xl font-semibold tracking-tight">Empresas</h1>
+  <a href="/empresas/nueva" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ Nueva empresa</a>
+</div>
+
+{# Los filtros piden solo la tabla (hx-target) y actualizan la URL para poder compartirla. #}
+<form id="filters" action="/empresas" method="get"
+      hx-get="/empresas" hx-target="#company-table" hx-swap="outerHTML" hx-push-url="true"
+      hx-trigger="change, input changed delay:300ms from:input[name=q]"
+      class="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+  <input name="q" value="{{ filters.text }}" placeholder="Buscar…" type="search"
+         class="col-span-2 md:col-span-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+  <select name="grupo" class="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+    <option value="">Todas</option>
+    <option value="potenciales" {{ 'selected' if filters.group == 'potenciales' }}>Potenciales</option>
+    <option value="clientes" {{ 'selected' if filters.group == 'clientes' }}>Clientes</option>
+  </select>
+  <select name="fase" class="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+    <option value="">Todas las fases</option>
+    {% for ph in phases %}<option value="{{ ph.value }}" {{ 'selected' if filters.phase == ph.value }}>{{ ph.value }}</option>{% endfor %}
+  </select>
+  <select name="sector" class="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+    <option value="">Todos los sectores</option>
+    {% for s in sectors %}<option {{ 'selected' if filters.sector == s }}>{{ s }}</option>{% endfor %}
+  </select>
+  <select name="municipio" class="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+    <option value="">Todos los municipios</option>
+    {% for m in municipalities %}<option {{ 'selected' if filters.municipality == m }}>{{ m }}</option>{% endfor %}
+  </select>
+  <input type="hidden" name="orden" value="{{ filters.sort }}">
+  <input type="hidden" name="dir" value="{{ filters.descending }}">
+  <noscript><button class="rounded-lg border px-3 py-2 text-sm">Filtrar</button></noscript>
+</form>
+
+{% include "companies/_table.html" %}
+{% endblock %}

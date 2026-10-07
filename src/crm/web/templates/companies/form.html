@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ "Editar empresa" if company is not none else "Nueva empresa" }}{% endblock %}
+{% block content %}
+{% set editing = company is not none %}
+{# Valor de un campo: lo enviado (si hubo error) o lo guardado (si se edita). #}
+{% macro v(name, attr=none, money=false, iso=false) -%}
+  {%- if form and name in form -%}{{ form.get(name) }}
+  {%- elif company is not none -%}
+    {%- set raw = company[attr or name] -%}
+    {%- if raw is none -%}
+    {%- elif money -%}{{ raw|euros_input }}
+    {%- elif iso -%}{{ raw.isoformat() }}
+    {%- else -%}{{ raw }}{%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+{% set input_cls = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" %}
+
+<a href="{{ '/empresas/' ~ company.id if editing else '/empresas' }}" class="text-sm text-slate-500 hover:text-indigo-700">← Volver</a>
+<h1 class="mt-1 mb-5 text-2xl font-semibold tracking-tight">{{ "Editar " ~ company.name if editing else "Nueva empresa" }}</h1>
+
+{% if error %}
+  <div class="mb-4 rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800">{{ error }}</div>
+{% endif %}
+
+<form method="post" class="space-y-5">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm grid gap-4 sm:grid-cols-2">
+    {{ ui.field("name", "Nombre", v("name"), required=true) }}
+    {{ ui.field("sector", "Sector", v("sector"), placeholder="Carpintería, transporte…") }}
+    {{ ui.field("municipality", "Municipio", v("municipality"), placeholder="Soria") }}
+    {{ ui.field("source", "Origen", v("source"), placeholder="Visita, recomendación, FOES…") }}
+    {{ ui.field("website", "Web", v("website")) }}
+    {{ ui.field("phone", "Teléfono general", v("phone"), type="tel") }}
+  </section>
+
+  <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm grid gap-4 sm:grid-cols-2">
+    {% set selected_service = (form.get("service_id") if form and "service_id" in form else (company.service_id|string if editing and company.service_id else "")) %}
+    <label class="block">
+      <span class="text-sm text-slate-600">Servicio de interés</span>
+      <select name="service_id" class="{{ input_cls }}">
+        <option value="">—</option>
+        {% for s in services %}<option value="{{ s.id }}" {{ 'selected' if selected_service == s.id|string }}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {{ ui.field("pain_score", "Puntuación de dolor (0–100)", v("pain_score"), type="number") }}
+    {{ ui.field("estimated_value", "Valor estimado (€)", v("estimated_value", "estimated_value_cents", money=true), placeholder="1.700") }}
+    {{ ui.field("estimated_fee", "Cuota estimada (€/mes)", v("estimated_fee", "estimated_fee_cents", money=true), placeholder="120") }}
+    {{ ui.field("next_step", "Próximo paso", v("next_step")) }}
+    {{ ui.field("next_step_date", "Fecha del próximo paso", v("next_step_date", iso=true), type="date") }}
+    <label class="block sm:col-span-2">
+      <span class="text-sm text-slate-600">Notas (dolor, ROI, contexto)</span>
+      <textarea name="notes" rows="6" class="{{ input_cls }}">{{ v("notes") }}</textarea>
+    </label>
+  </section>
+
+  <div class="flex gap-2">
+    <button class="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">{{ "Guardar cambios" if editing else "Crear empresa" }}</button>
+    <a href="{{ '/empresas/' ~ company.id if editing else '/empresas' }}" class="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm hover:bg-slate-50">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

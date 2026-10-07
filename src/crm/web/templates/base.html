@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}CRM{% endblock %} · CRM</title>
+  {# Deuda técnica: Tailwind, HTMX y Chart.js por CDN. En producción, servirlos en local. #}
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased"
+      hx-boost="true"
+      hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+{% set nav = nav_items %}
+<div class="min-h-screen md:flex">
+  {# Barra lateral (escritorio) #}
+  <aside class="hidden md:flex md:w-56 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-slate-200">
+    <div class="px-5 py-5 text-lg font-semibold tracking-tight">
+      <span class="text-indigo-600">●</span> CRM
+    </div>
+    <nav class="flex-1 px-3 space-y-1">
+      {% for href, label, icon in nav %}
+        {% set active = (path == href) or (href != "/" and path.startswith(href)) %}
+        <a href="{{ href }}"
+           class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium {{ 'bg-indigo-50 text-indigo-700' if active else 'text-slate-600 hover:bg-slate-100' }}">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
+          {{ label }}
+        </a>
+      {% endfor %}
+    </nav>
+    {% if user %}
+    <form method="post" action="/logout" class="px-3 py-4 border-t border-slate-200">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="px-3 text-xs text-slate-500 mb-2">{{ user.username }}</div>
+      <button class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">Cerrar sesión</button>
+    </form>
+    {% endif %}
+  </aside>
+
+  <main class="flex-1 md:ml-56 pb-24 md:pb-8">
+    {# Cabecera móvil #}
+    <header class="md:hidden sticky top-0 z-10 flex items-center justify-between bg-white/90 backdrop-blur border-b border-slate-200 px-4 py-3">
+      <span class="font-semibold"><span class="text-indigo-600">●</span> CRM</span>
+      {% if user %}
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="text-sm text-slate-500">Salir</button>
+      </form>
+      {% endif %}
+    </header>
+
+    <div class="mx-auto max-w-6xl px-4 py-6 md:px-8">
+      {% for message in flashes %}
+        <div class="mb-4 rounded-lg px-4 py-3 text-sm {{ 'bg-rose-50 text-rose-800 border border-rose-200' if message.kind == 'error' else 'bg-emerald-50 text-emerald-800 border border-emerald-200' }}">
+          {{ message.text }}
+        </div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {# Menú inferior (móvil) #}
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-10 bg-white border-t border-slate-200 flex justify-around">
+    {% for href, label, icon in nav %}
+      {% set active = (path == href) or (href != "/" and path.startswith(href)) %}
+      <a href="{{ href }}" class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs {{ 'text-indigo-600' if active else 'text-slate-500' }}">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
+        {{ label }}
+      </a>
+    {% endfor %}
+  </nav>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

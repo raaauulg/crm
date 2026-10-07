@@ -1,0 +1,56 @@
+# consultoria-crm
+
+Local-first web CRM for a one-person AI consultancy: **FastAPI + HTMX + SQLite**, with an **MCP server** so an AI assistant can query and update the pipeline in plain language.
+
+It tracks **prospects** (from lead to closing) and **clients** (contracts, monthly fees / MRR, invoices and payments). The UI is in Spanish; the code is in English.
+
+> This repository contains **no real customer data**. Everything under the demo loader is fictional.
+
+## Quick start
+
+Requires [uv](https://docs.astral.sh/uv/). Python 3.12 is downloaded by uv if missing.
+
+```bash
+uv sync                          # install dependencies
+uv run alembic upgrade head      # create / migrate the SQLite database (data/crm.db)
+uv run crm crear-usuario raul    # create a login user (asks for the password)
+uv run crm demo                  # optional: load fictional demo data
+uv run crm serve                 # http://127.0.0.1:8000
+```
+
+Configuration comes from environment variables or a `.env` file (see `.env.example`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SECRET_KEY` | random per run | Signs the session cookie. Set it, or sessions are lost on restart. |
+| `CRM_DB_PATH` | `data/crm.db` | SQLite database file. |
+| `CRM_HOST` / `CRM_PORT` | `127.0.0.1` / `8000` | Where the web app listens. |
+| `CRM_SECURE_COOKIES` | `false` | Set to `true` behind HTTPS. |
+| `CRM_VAULT_PATH` | – | Obsidian vault, only for `crm exportar-obsidian`. |
+
+## Features
+
+- Dashboard with two tabs: **prospects** (count per stage, € in play, overdue and upcoming follow-ups, weekly interactions) and **clients** (MRR, invoiced this month / year, pending and overdue receivables).
+- Company table with live filters (HTMX) and sortable columns; company page with contacts, notes, interaction history, stage change and next step.
+- Login with argon2 password hashes, signed `HttpOnly` / `SameSite=Lax` session cookie and CSRF tokens on every form.
+- Money stored as integer cents; dates in Europe/Madrid; Spanish formatting (`1.700,00 €`, `07/10/2026`).
+
+## Architecture
+
+```
+models (SQLAlchemy 2.0)  →  services (all business logic)  →  web (FastAPI + Jinja2 + HTMX)
+                                                         →  cli (Typer)
+                                                         →  mcp (stdio server)
+```
+
+The web app, the CLI and the MCP server never touch the database directly: they all go through `crm.services`, so business rules are tested once. See `docs/GUIA.md` (Spanish) for a guided tour.
+
+## Development
+
+```bash
+uv run pytest            # tests (temporary SQLite databases, never real data)
+uv run ruff check .      # lint
+uv run ruff format .     # format
+```
+
+Tailwind CSS, HTMX and Chart.js are loaded from a CDN (no Node build step). For production they should be vendored locally.

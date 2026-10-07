@@ -1,0 +1,51 @@
+{% import "_macros.html" as ui %}
+{% macro sort_link(column, label, extra_class="") -%}
+  {% set base_params = {"q": filters.text, "grupo": filters.group, "fase": filters.phase, "sector": filters.sector, "municipio": filters.municipality} %}
+  {% set is_current = filters.sort == column %}
+  {% set next_dir = "desc" if is_current and filters.descending == "asc" else "asc" %}
+  {% set params = dict(base_params, orden=column, dir=next_dir) %}
+  <th class="px-3 py-2 text-left font-medium {{ extra_class }}">
+    <a href="/empresas?{{ params|urlencode }}" class="hover:text-indigo-700">
+      {{ label }}{% if is_current %} {{ "↓" if filters.descending == "desc" else "↑" }}{% endif %}
+    </a>
+  </th>
+{%- endmacro %}
+<div id="company-table" class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+  <div class="px-4 py-2 text-xs text-slate-500 border-b border-slate-100">{{ companies|length }} empresa{{ "" if companies|length == 1 else "s" }}</div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500">
+        <tr>
+          {{ sort_link("name", "Empresa") }}
+          {{ sort_link("phase", "Fase") }}
+          {{ sort_link("sector", "Sector", "hidden md:table-cell") }}
+          {{ sort_link("municipality", "Municipio", "hidden md:table-cell") }}
+          {{ sort_link("value", "Valor est.", "hidden lg:table-cell text-right") }}
+          {{ sort_link("next_step_date", "Próximo paso", "hidden sm:table-cell") }}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for c in companies %}
+          <tr class="hover:bg-slate-50">
+            <td class="px-3 py-2">
+              <a href="/empresas/{{ c.id }}" class="font-medium text-slate-900 hover:text-indigo-700">{{ c.name }}</a>
+              <div class="md:hidden text-xs text-slate-500">{{ c.municipality }}</div>
+            </td>
+            <td class="px-3 py-2">{{ ui.phase_badge(c.phase) }}</td>
+            <td class="px-3 py-2 hidden md:table-cell text-slate-600">{{ c.sector }}</td>
+            <td class="px-3 py-2 hidden md:table-cell text-slate-600">{{ c.municipality }}</td>
+            <td class="px-3 py-2 hidden lg:table-cell text-right tabular-nums">{{ c.estimated_value_cents|euros(false) }}</td>
+            <td class="px-3 py-2 hidden sm:table-cell">
+              {% if c.next_step_date %}
+                <span class="tabular-nums {{ 'text-rose-600 font-medium' if c.next_step_date < today and c.phase != '7-Perdido' else 'text-slate-600' }}">{{ c.next_step_date|fecha }}</span>
+              {% endif %}
+              <span class="text-slate-500">{{ c.next_step|truncate(40) }}</span>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">No hay empresas con esos filtros.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

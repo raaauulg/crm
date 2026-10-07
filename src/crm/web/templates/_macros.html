@@ -1,0 +1,32 @@
+{% macro kpi(label, value, hint="", tone="") -%}
+<div class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+  <div class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ label }}</div>
+  <div class="mt-1 text-2xl font-semibold tabular-nums {{ tone }}">{{ value }}</div>
+  {% if hint %}<div class="mt-0.5 text-xs text-slate-500">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro phase_badge(phase) -%}
+<span class="inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium {{ phase|fase_color }}">{{ phase }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+<span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium {{ status|estado_color }}">{{ status }}</span>
+{%- endmacro %}
+
+{% macro field(name, label, value="", type="text", required=false, placeholder="", hint="") -%}
+<label class="block">
+  <span class="text-sm text-slate-600">{{ label }}{% if required %} *{% endif %}</span>
+  <input name="{{ name }}" type="{{ type }}" value="{{ value if value is not none else '' }}" placeholder="{{ placeholder }}"
+         {% if required %}required{% endif %}
+         class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+  {% if hint %}<span class="text-xs text-slate-500">{{ hint }}</span>{% endif %}
+</label>
+{%- endmacro %}
+
+{% macro card(title="", id="") -%}
+<section {% if id %}id="{{ id }}"{% endif %} class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+  {% if title %}<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{{ title }}</h2>{% endif %}
+  {{ caller() }}
+</section>
+{%- endmacro %}

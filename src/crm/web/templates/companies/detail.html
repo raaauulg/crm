@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ company.name }}{% endblock %}
+{% block content %}
+{% set input_cls = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" %}
+<div class="mb-5">
+  <a href="/empresas" class="text-sm text-slate-500 hover:text-indigo-700">← Empresas</a>
+  <div class="mt-1 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight">{{ company.name }}</h1>
+      {{ ui.phase_badge(company.phase) }}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/empresas/{{ company.id }}/editar" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">Editar</a>
+      {% if not is_client %}
+        <a href="/empresas/{{ company.id }}/convertir" class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Convertir en cliente</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="mt-1 text-sm text-slate-500">
+    {{ [company.sector, company.municipality]|select|join(" · ") }}
+    {% if company.website %} · <a href="{{ company.website if company.website.startswith('http') else 'https://' ~ company.website }}" target="_blank" rel="noopener noreferrer" class="hover:text-indigo-700">{{ company.website }}</a>{% endif %}
+    {% if company.phone %} · <a href="tel:{{ company.phone|replace(' ', '') }}" class="hover:text-indigo-700">{{ company.phone }}</a>{% endif %}
+  </div>
+</div>
+
+<div class="grid gap-5 lg:grid-cols-3">
+  <div class="space-y-5 lg:col-span-2">
+    {% if is_client %}
+      {% include "companies/_client_panel.html" ignore missing %}
+    {% endif %}
+
+    <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Próximo paso</h2>
+      <form method="post" action="/empresas/{{ company.id }}/proximo-paso" class="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="block"><span class="text-sm text-slate-600">Qué</span>
+          <input name="next_step" value="{{ company.next_step }}" placeholder="Llamar para cerrar la reunión" class="{{ input_cls }}"></label>
+        <label class="block"><span class="text-sm text-slate-600">Cuándo</span>
+          <input name="next_step_date" type="date" value="{{ company.next_step_date.isoformat() if company.next_step_date else '' }}" class="{{ input_cls }}"></label>
+        <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Guardar</button>
+      </form>
+      {% if company.next_step_date and company.next_step_date < today %}
+        <p class="mt-2 text-sm font-medium text-rose-600">Vencido desde el {{ company.next_step_date|fecha }}.</p>
+      {% endif %}
+    </section>
+
+    <section id="historial" class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Registrar interacción</h2>
+      <form method="post" action="/empresas/{{ company.id }}/interacciones" class="grid gap-2 sm:grid-cols-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label class="block"><span class="text-sm text-slate-600">Fecha</span>
+          <input name="occurred_on" type="date" value="{{ today.isoformat() }}" class="{{ input_cls }}"></label>
+        <label class="block"><span class="text-sm text-slate-600">Canal</span>
+          <select name="channel" class="{{ input_cls }}">
+            {% for ch in channels %}<option value="{{ ch.value }}">{{ ch.value|capitalize }}</option>{% endfor %}
+          </select></label>
+        <label class="block sm:col-span-2"><span class="text-sm text-slate-600">Resultado</span>
+          <input name="result" placeholder="Quedamos en enviar propuesta" class="{{ input_cls }}"></label>
+        <label class="block sm:col-span-4"><span class="text-sm text-slate-600">Resumen *</span>
+          <textarea name="summary" rows="2" required class="{{ input_cls }}"></textarea></label>
+        <div class="sm:col-span-4"><button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Registrar</button></div>
+      </form>
+
+      <h2 class="mt-6 mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Historial</h2>
+      {% if company.interactions %}
+        <ol class="relative border-l border-slate-200 ml-2 space-y-4">
+          {% for it in company.interactions %}
+            <li class="ml-4">
+              <span class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-indigo-400"></span>
+              <div class="text-xs text-slate-500">{{ it.occurred_on|fecha }} · {{ it.channel }} · {{ it.created_by }}</div>
+              <div class="text-sm text-slate-800 whitespace-pre-line">{{ it.summary }}</div>
+              {% if it.result %}<div class="text-sm text-slate-500">→ {{ it.result }}</div>{% endif %}
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="text-sm text-slate-500">Sin interacciones todavía.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="space-y-5">
+    <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Cambiar fase</h2>
+      <form method="post" action="/empresas/{{ company.id }}/fase" class="flex gap-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <select name="phase" class="{{ input_cls }} mt-0">
+          {% for ph in phase_targets %}<option value="{{ ph.value }}">{{ ph.value }}</option>{% endfor %}
+        </select>
+        <button class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">Cambiar</button>
+      </form>
+    </section>
+
+    <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Datos comerciales</h2>
+      <dl class="grid grid-cols-2 gap-y-2 text-sm">
+        <dt class="text-slate-500">Servicio de interés</dt><dd>{{ company.service.name if company.service else "—" }}</dd>
+        <dt class="text-slate-500">Valor estimado</dt><dd class="tabular-nums">{{ company.estimated_value_cents|euros }}</dd>
+        <dt class="text-slate-500">Cuota estimada</dt><dd class="tabular-nums">{{ company.estimated_fee_cents|euros }}</dd>
+        <dt class="text-slate-500">Dolor (0–100)</dt><dd>{{ company.pain_score if company.pain_score is not none else "—" }}</dd>
+        <dt class="text-slate-500">Origen</dt><dd>{{ company.source or "—" }}</dd>
+        <dt class="text-slate-500">Actualizado</dt><dd>{{ company.updated_at|fecha }} · {{ company.updated_by }}</dd>
+      </dl>
+    </section>
+
+    <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Contactos</h2>
+        <a href="/empresas/{{ company.id }}/contactos/nuevo" class="text-sm text-indigo-600 hover:text-indigo-800">+ Añadir</a>
+      </div>
+      {% for ct in company.contacts %}
+        <div class="py-2 {{ 'border-t border-slate-100' if not loop.first }}">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">{{ ct.name }}{% if ct.is_primary %} <span class="ml-1 rounded bg-indigo-50 px-1.5 text-xs text-indigo-700">principal</span>{% endif %}</div>
+            <a href="/empresas/{{ company.id }}/contactos/{{ ct.id }}/editar" class="text-xs text-slate-500 hover:text-indigo-700">editar</a>
+          </div>
+          {% if ct.role %}<div class="text-sm text-slate-500">{{ ct.role }}</div>{% endif %}
+          <div class="text-sm">
+            {% if ct.phone %}<a href="tel:{{ ct.phone|replace(' ', '') }}" class="text-indigo-700">{{ ct.phone }}</a>{% endif %}
+            {% if ct.email %}<a href="mailto:{{ ct.email }}" class="block text-indigo-700 break-all">{{ ct.email }}</a>{% endif %}
+          </div>
+        </div>
+      {% else %}
+        <p class="text-sm text-slate-500">Sin contactos.</p>
+      {% endfor %}
+    </section>
+
+    <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Notas</h2>
+      {% if company.notes %}
+        <div class="text-sm whitespace-pre-line text-slate-700">{{ company.notes }}</div>
+      {% else %}
+        <p class="text-sm text-slate-500">Sin notas. Añádelas desde «Editar» (dolor, ROI, contexto).</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

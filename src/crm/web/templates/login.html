@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · CRM</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center px-4">
+  <form method="post" action="/login" class="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-5">
+    <div class="text-xl font-semibold tracking-tight"><span class="text-indigo-600">●</span> CRM</div>
+    {% if error %}
+      <div class="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-sm text-rose-800">{{ error }}</div>
+    {% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="block">
+      <span class="text-sm text-slate-600">Usuario</span>
+      <input name="username" autocomplete="username" required autofocus
+             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <label class="block">
+      <span class="text-sm text-slate-600">Contraseña</span>
+      <input name="password" type="password" autocomplete="current-password" required
+             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <button class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-700">Entrar</button>
+  </form>
+</body>
+</html>

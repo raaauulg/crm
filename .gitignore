@@ -1,0 +1,32 @@
+# Datos reales: nunca al repositorio
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+exports/
+
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Ajustes locales de Claude Code (rutas propias del PC de Raúl)
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+
+# Editores y sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
