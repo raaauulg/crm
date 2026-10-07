@@ -21,4 +21,5 @@ def home(
         context["pipeline"] = dashboard.pipeline_summary(session)
     else:
         context["clients"] = dashboard.clients_summary(session)
+        context["monthly"] = dashboard.monthly_revenue(session)
     return render(request, "dashboard.html", context)
