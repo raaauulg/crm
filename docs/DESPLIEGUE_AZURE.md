@@ -55,8 +55,11 @@ Si cierras PowerShell a mitad, vuelve a definirlas (y apunta el valor de `$ST`: 
 
 ```powershell
 az group create --name $RG --location $LOC
-az containerapp env create --name $ENV_NAME --resource-group $RG --location $LOC
+az containerapp env create --name $ENV_NAME --resource-group $RG --location $LOC `
+  --environment-mode WorkloadProfiles
 ```
+
+Pon `--environment-mode WorkloadProfiles` sí o sí. Si no lo pones, la CLI puede crear un entorno *express* (modo nuevo, en preview), que **no admite volúmenes de Azure Files**. El paso 3 fallaría con `ExpressEnvironmentResourceNotSupported`. Con `WorkloadProfiles` se usa el perfil de consumo: escala a cero, sin cuota de VMs y con el mismo precio.
 
 ## 3. Almacenamiento para la base de datos
 
