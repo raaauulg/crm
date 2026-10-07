@@ -34,13 +34,19 @@ HOW_TO_ADD_MARKERS = (
 class ExportResult:
     path: Path
     new_text: str
+    summary: str  # la tabla que va entre los marcadores
     changed: bool
     written: bool
 
 
 def _cell(text: str | None) -> str:
-    """Celda de tabla Markdown: sin saltos de línea y con `|` escapado."""
-    return (text or "").replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+    """Celda de tabla Markdown: sin saltos de línea, con `|` escapado y sin HTML.
+
+    `<` y `>` se escapan para que un texto (importado o escrito por Claude) no pueda colar
+    un marcador `<!-- crm:… -->`, un comentario que oculte la nota ni HTML en Obsidian.
+    """
+    cleaned = (text or "").replace("\r", " ").replace("\n", " ").replace("|", "\\|")
+    return cleaned.replace("<", "&lt;").replace(">", "&gt;").strip()
 
 
 def render_summary(session: Session, on: date | None = None, newline: str = "\n") -> str:
@@ -107,16 +113,17 @@ def export_summary(
         raise ServiceError(f"La nota {path} tiene los marcadores repetidos; deja una sola pareja.")
 
     newline = "\r\n" if "\r\n" in text else "\n"
-    block = newline + render_summary(session, on, newline) + newline
+    summary = render_summary(session, on, newline)
+    block = newline + summary + newline
     head = text[: start + len(START_MARKER)]
     tail = text[end:]
     new_text = head + block + tail
     changed = new_text != text
     if dry_run or not changed:
-        return ExportResult(path, new_text, changed, written=False)
+        return ExportResult(path, new_text, summary, changed, written=False)
 
     _atomic_write(path, new_text.encode("utf-8"))
-    return ExportResult(path, new_text, changed, written=True)
+    return ExportResult(path, new_text, summary, changed, written=True)
 
 
 def _atomic_write(path: Path, data: bytes) -> None:

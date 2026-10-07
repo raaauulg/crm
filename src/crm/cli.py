@@ -110,11 +110,10 @@ def export_obsidian(
     try:
         with session_scope(default_session_factory()) as session:
             result = export.export_summary(session, vault, dry_run=dry_run)
-            block = export.render_summary(session)
     except ServiceError as exc:
         _fail(str(exc))
     if dry_run:
-        typer.echo(block)
+        typer.echo(result.summary)
         typer.echo(f"\nModo --dry-run: no se ha escrito {result.path}.")
     elif result.written:
         typer.secho(f"Tabla actualizada en {result.path}.", fg=typer.colors.GREEN)

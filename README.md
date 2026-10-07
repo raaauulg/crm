@@ -32,7 +32,13 @@ Configuration comes from environment variables or a `.env` file (see `.env.examp
 
 - Dashboard with two tabs: **prospects** (count per stage, € in play, overdue and upcoming follow-ups, weekly interactions) and **clients** (MRR, invoiced this month / year, pending and overdue receivables).
 - Company table with live filters (HTMX) and sortable columns; company page with contacts, notes, interaction history, stage change and next step.
+- Charts (Chart.js): stage funnel, MRR and invoiced revenue per month.
+- Kanban of open prospects with one-click stage changes.
+- Clients: convert a prospect into a client with its first contract, contracts and cancellations, invoice **records** (the CRM does not issue invoices) and payments, editable service catalog.
 - Login with argon2 password hashes, signed `HttpOnly` / `SameSite=Lax` session cookie and CSRF tokens on every form.
+- **MCP server** (stdio, `crm-mcp`, registered in `.mcp.json`): search companies, view a company, next steps, pipeline and client summaries; create companies, log interactions, change stages and set next steps. Writes are attributed to `mcp`; nothing can be deleted or sent.
+- `crm importar leads.csv [--dry-run]`: CSV import with header synonyms, `--columna field=Header` overrides and duplicate detection (accent/case-insensitive).
+- `crm exportar-obsidian [--dry-run]`: writes a summary table into an Obsidian note, only between `<!-- crm:resumen:inicio -->` and `<!-- crm:resumen:fin -->`, atomically.
 - Money stored as integer cents; dates in Europe/Madrid; Spanish formatting (`1.700,00 €`, `07/10/2026`).
 
 ## Architecture

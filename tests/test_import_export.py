@@ -85,6 +85,42 @@ def test_read_csv_falls_back_to_windows_encoding(tmp_path: Path) -> None:
     assert "Óptica Ñandú" in importer.read_csv_text(path)
 
 
+def test_unknown_encoding_gives_a_clear_error(tmp_path: Path) -> None:
+    path = tmp_path / "raro.csv"
+    path.write_bytes(b"Nombre\n\x81\x8d\x8f\n")
+    with pytest.raises(ServiceError, match="CSV UTF-8"):
+        importer.read_csv_text(path)
+
+
+def test_company_column_wins_over_person_name_column() -> None:
+    mapping = importer.build_mapping(["Empresa", "Nombre", "Teléfono", "Email"])
+    assert mapping["name"] == "Empresa"
+    assert mapping["contact_name"] == "Nombre"
+    # Sin columna de empresa, "Nombre" es el de la empresa y no se reutiliza para el contacto.
+    alone = importer.build_mapping(["Nombre", "Email"])
+    assert alone["name"] == "Nombre" and "contact_name" not in alone
+
+
+def test_invalid_row_is_skipped_and_the_rest_imported(session: Session) -> None:
+    text = "Empresa;Notas\nBuena Ejemplo;ok\n" + "X" * 250 + ";demasiado largo\nOtra Ejemplo;ok\n"
+    report = importer.run_import(session, text)
+    assert [r.company.name for r in report.to_create] == ["Buena Ejemplo", "Otra Ejemplo"]
+    assert [line for line, _ in report.errors] == [3]
+    assert count(session) == 2
+
+
+def test_import_is_all_or_nothing(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken_commit() -> None:
+        raise RuntimeError("disco lleno (simulado)")
+
+    monkeypatch.setattr(session, "commit", broken_commit)
+    with pytest.raises(RuntimeError):
+        importer.run_import(session, CSV_TEXT)
+    monkeypatch.undo()
+    session.rollback()
+    assert count(session) == 0
+
+
 # --- Exportación a Obsidian --------------------------------------------------------------
 
 
@@ -158,6 +194,19 @@ def test_export_without_valid_markers_writes_nothing(
 def test_export_missing_note(session: Session, tmp_path: Path) -> None:
     with pytest.raises(ServiceError, match="No encuentro"):
         export.export_summary(session, tmp_path, on=TODAY)
+
+
+def test_markers_and_html_in_names_cannot_break_the_note(session: Session, tmp_path: Path) -> None:
+    companies.create_company(
+        session, CompanyInput(name=f"Trampa {export.END_MARKER} <img src=x>"), "raul"
+    )
+    vault = make_vault(tmp_path, NOTE)
+    export.export_summary(session, vault, on=TODAY)
+    text = (vault / export.TARGET_NOTE).read_text("utf-8")
+    assert text.count(export.END_MARKER) == 1 and text.count(export.START_MARKER) == 1
+    assert "<img" not in text and "&lt;img src=x&gt;" in text
+    # Y la siguiente exportación sigue funcionando.
+    assert export.export_summary(session, vault, on=TODAY).changed is False
 
 
 def test_pipe_in_name_is_escaped(session: Session) -> None:

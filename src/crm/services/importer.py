@@ -26,14 +26,16 @@ ALL_FIELDS = COMPANY_FIELDS + CONTACT_FIELDS
 
 # Cabeceras reconocidas sin configurar nada (comparadas sin tildes ni mayúsculas).
 HEADER_SYNONYMS: dict[str, tuple[str, ...]] = {
-    "name": ("nombre", "empresa", "razon social", "name", "company"),
+    # "empresa" antes que "nombre": en "Empresa;Nombre;…" la columna Nombre suele ser la persona.
+    "name": ("empresa", "razon social", "nombre empresa", "company", "nombre", "name"),
     "sector": ("sector", "actividad", "industria"),
     "municipality": ("municipio", "localidad", "poblacion", "ciudad", "city"),
     "website": ("web", "website", "url", "pagina web"),
     "phone": ("telefono", "tel", "telefono empresa", "phone"),
     "source": ("origen", "fuente", "source"),
     "notes": ("notas", "observaciones", "comentarios", "notes"),
-    "contact_name": ("contacto", "persona de contacto", "nombre contacto", "contact"),
+    # "nombre" solo llega aquí si ya hay otra columna para la empresa (no se reutilizan).
+    "contact_name": ("contacto", "persona de contacto", "nombre contacto", "contact", "nombre"),
     "contact_role": ("cargo", "puesto", "role"),
     "contact_phone": ("telefono contacto", "movil", "mobile"),
     "contact_email": ("email", "correo", "e mail", "correo electronico", "mail"),
@@ -62,7 +64,13 @@ def read_csv_text(path: Path) -> str:
     try:
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError:
+        pass
+    try:
         return raw.decode("cp1252")
+    except UnicodeDecodeError as exc:
+        raise ServiceError(
+            f"No entiendo la codificación de {path.name}. Guárdalo desde Excel como «CSV UTF-8»."
+        ) from exc
 
 
 def build_mapping(headers: list[str], overrides: dict[str, str] | None = None) -> dict[str, str]:
@@ -105,7 +113,8 @@ def plan_import(
 
     existing = {fold(name): name for name in session.scalars(select(Company.name))}
     seen: dict[str, int] = {}
-    for line, row in enumerate(reader, start=2):
+    for row in reader:
+        line = reader.line_num  # línea real del archivo (aunque haya campos de varias líneas)
         values = {f: (row.get(h) or "").strip() for f, h in report.mapping.items()}
         name = values.get("name", "")
         if not name:

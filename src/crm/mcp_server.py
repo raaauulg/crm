@@ -152,11 +152,13 @@ def build_server(factory: sessionmaker[Session] | None = None) -> MCPServer:
         """Seguimientos vencidos y los de los próximos `dias` días (empresas no perdidas)."""
         with _session(session_factory) as session:
             on = today()
-            items = companies.upcoming_steps(session, on + timedelta(days=max(0, dias)))
+            items = companies.upcoming_steps(session, on + timedelta(days=max(0, min(dias, 365))))
+            # upcoming_steps solo devuelve empresas con fecha; `or on` es para el tipado.
+            overdue = [c for c in items if (c.next_step_date or on) < on]
             return {
                 "hoy": on.isoformat(),
-                "vencidos": [_company_summary(c) for c in items if c.next_step_date < on],
-                "proximos": [_company_summary(c) for c in items if c.next_step_date >= on],
+                "vencidos": [_company_summary(c) for c in overdue],
+                "proximos": [_company_summary(c) for c in items if c not in overdue],
             }
 
     @server.tool(annotations=READ_ONLY)
@@ -219,6 +221,8 @@ def build_server(factory: sessionmaker[Session] | None = None) -> MCPServer:
                 phase = Phase(fase)
             except ValueError as exc:
                 raise ServiceError(f"Fase desconocida: {fase!r}") from exc
+            if phase is Phase.LEAD:
+                raise ServiceError("0-Lead es solo para importaciones; usa 1-Identificado.")
             data = validate(
                 CompanyInput,
                 {

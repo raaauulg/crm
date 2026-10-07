@@ -106,3 +106,41 @@ La base de datos tiene un esquema (tablas y columnas) que evoluciona. Alembic gu
 | Dinero | Céntimos que bailan | Los importes son `int` en céntimos; `parse_euros` interpreta "1.700" como mil setecientos y "1700.5" como decimal. Nunca `float`. |
 | Migraciones | `test_migrations` falla | Cambiaste `models.py` sin generar migración. |
 | Plantillas | Error 500 en una ficha | Un campo `None` usado sin comprobar (por ejemplo `.isoformat()` sobre una fecha vacía). Mira la traza en la terminal. |
+| HTMX + JS de terceros | La pestaña se congela al navegar | Visto en la prueba visual: sustituir por HTMX una página con gráficos de Chart.js, o cargar SortableJS en el kanban, congelaba Chrome. Por eso el dashboard va sin `hx-boost` y el kanban no tiene arrastrar y soltar (DECISIONES 26 y 27). Si añades JS de terceros, pruébalo navegando con HTMX, no solo con carga completa. |
+| MCP | Claude no ve el servidor | `.mcp.json` lanza `uv run crm-mcp`: `uv` tiene que estar en el PATH del proceso de Claude Code. Prueba a mano: `uv run crm-mcp` debe quedarse esperando (habla por stdin/stdout). |
+| MCP | Claude recibe "Error executing tool" | Una excepción que no es `ServiceError` (un bug). Mira el log de Claude Code; los errores previstos llegan con su mensaje. |
+| Exportación | "no tiene los marcadores" | Faltan `<!-- crm:resumen:inicio -->` / `<!-- crm:resumen:fin -->` en `negocio/clientes_potenciales.md`, o están repetidos o al revés. No se escribe nada. |
+| Importación | Tildes rotas ("Ã³") | El CSV no es UTF-8 ni Windows-1252. Guárdalo desde Excel como "CSV UTF-8". |
+
+## 5. Clientes, contratos y MRR (nivel 2)
+
+- **Convertir en cliente** (`clients.convert_to_client`): en una sola transacción pasa la empresa a `6-Ganado` y crea su primer contrato. Si el contrato no valida, la empresa se queda como estaba (`rollback`).
+- **Contrato activo = fechas** (`clients.contract_is_active`): empezado y sin terminar. El estado `cancelado` solo dice que la baja está registrada. Así una baja avisada hoy con fin el 31/12 sigue sumando al MRR hasta el 31/12, y el gráfico de meses pasados no cambia.
+- **MRR** = suma de las cuotas de los contratos activos en una fecha. El gráfico calcula el MRR del último día de cada mes (o de hoy, en el mes en curso).
+- **Facturas**: el CRM no las emite (eso lo haría un programa de facturación con Verifactu), solo las apunta. El estado (`cobrada`, `pendiente`, `vencida`) **no se guarda**: se calcula cada vez a partir de las fechas, así nunca se queda desfasado.
+
+## 6. Integraciones (nivel 3)
+
+### MCP (Model Context Protocol)
+
+Un protocolo para que un asistente como Claude use herramientas de un programa. Nuestro servidor (`src/crm/mcp_server.py`) es un proceso que Claude Code lanza y con el que habla por **stdin/stdout** en JSON-RPC: Claude pide la lista de herramientas (`tools/list`), ve sus parámetros (salen de los tipos de las funciones Python) y las llama (`tools/call`).
+
+- Cada herramienta es una función decorada con `@server.tool(...)` que abre una sesión, llama a `services` y devuelve un diccionario (que el SDK convierte en JSON).
+- `ToolAnnotations(read_only_hint=True)` avisa al cliente de que una herramienta solo lee.
+- Las escrituras se guardan con autor `mcp`, para saber qué cambió Claude.
+- No hay herramientas para borrar, enviar mensajes ni registrar facturas: lo que no existe, Claude no lo puede hacer.
+- Pruébalo: abre Claude Code en esta carpeta (lee `.mcp.json`) y pide "¿qué seguimientos tengo vencidos?".
+
+### Importación CSV (`crm importar`)
+
+`services/importer.py` primero **planifica** (`plan_import`: lee, mapea columnas, detecta duplicados y errores) y solo después escribe, en una transacción. `--dry-run` enseña el plan sin escribir. Las columnas se reconocen por sinónimos ("Razón social", "Localidad"…) o con `--columna name="Mi columna"`.
+
+### Exportación a Obsidian (`crm exportar-obsidian`)
+
+Solo toca el texto entre los dos marcadores. Lee el archivo como bytes, sustituye el trozo central y escribe en un **archivo temporal de la misma carpeta** que luego cambia por el original con `os.replace` (atómico: si se corta a mitad, la nota vieja sigue intacta). Respeta los finales de línea de Windows (CRLF) si la nota los usa.
+
+## 7. Autoevaluación
+
+1. Si das de baja hoy un contrato con fecha de fin el 31/12, ¿cuánto baja el MRR hoy y por qué? ¿Qué función lo decide?
+2. Pulsas "Cambiar fase" en una ficha: ¿qué dos comprobaciones de seguridad pasan antes de que se ejecute `companies.change_phase`, y en qué archivo están?
+3. Claude llama por MCP a `cambiar_fase` con `6-Ganado`. ¿Qué ve Claude y por qué no ve "Error executing tool"?

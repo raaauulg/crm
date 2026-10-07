@@ -156,3 +156,4 @@ uv run pytest && uv run ruff check .
 | Fecha | Qué | Horas | Notas |
 |---|---|---|---|
 | 2026-10-07 | Requisitos y preparación | | |
+| 2026-10-07 | Sesión nocturna sin supervisión (agente): niveles 1, 2 y 3 (sin arrastrar y soltar). Ver `MANANA.md` | | Horas de agente, no cuentan; Raúl: revisión pendiente |

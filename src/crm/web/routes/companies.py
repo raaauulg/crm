@@ -244,7 +244,7 @@ def new_contact_form(
     request: Request, company_id: int, session: Session = Depends(get_session)
 ) -> Response:
     company = companies.get_company(session, company_id)
-    context = {"company": company, "contact": None, "form": {}, "error": None}
+    context: dict[str, Any] = {"company": company, "contact": None, "form": {}, "error": None}
     return render(request, "companies/contact_form.html", context)
 
 
