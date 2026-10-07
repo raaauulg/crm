@@ -34,12 +34,15 @@ Sesión nocturna terminada: **niveles 1, 2 y 3 hechos**, salvo el arrastrar y so
 ## 2. Cómo verlo (PowerShell, en esta carpeta)
 
 ```powershell
-$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"   # uv no está en el PATH de PowerShell
+# uv y git no están en el PATH de PowerShell (git es MinGit portátil en ~/.local/mingit)
+$env:PATH = "$env:USERPROFILE\.local\mingit\cmd;$env:USERPROFILE\.local\bin;$env:PATH"
 uv sync; uv run alembic upgrade head; uv run crm crear-usuario raul
 uv run crm demo; uv run crm serve                      # http://127.0.0.1:8000
 ```
 
-Antes, crea `.env` a partir de `.env.example` y pon una `SECRET_KEY`. Sin ella, la sesión se pierde cada vez que reinicias el servidor.
+**Estado al terminar la sesión de mañana:** `data/crm.db` ya existe con la migración y la demo, y el servidor quedó arrancado en segundo plano. Solo falta `crear-usuario`, que pide tu contraseña.
+
+Crea `.env` a partir de `.env.example` y pon una `SECRET_KEY`. Sin ella, la sesión se pierde cada vez que reinicias el servidor.
 
 Para pasar a datos reales después de mirar la demo: borra `data/crm.db` (solo contiene la demo), vuelve a ejecutar `alembic upgrade head` y crea el usuario. No uses `crm demo` sobre la base real.
 
@@ -53,7 +56,7 @@ Para pasar a datos reales después de mirar la demo: borra `data/crm.db` (solo c
 
 ## 4. Pendiente y deuda técnica (por prioridad)
 
-1. **Instalar Git.** Los commits se hicieron con `dulwich` porque no había `git`; el `.git` es estándar. Revisa `git log` antes del primer push. El autor es `Claude Code (sesion nocturna)`; si quieres que figures tú, reescríbelo antes de publicar.
+1. **Git:** ya está, como MinGit 2.56 portátil en `%USERPROFILE%\.local\mingit` (descargado de la release oficial de Git for Windows, con el SHA-256 verificado). `git fsck` está limpio. Antes del primer push: configura tu identidad (`git config user.name` / `user.email`, ahora vacías) y revisa `git log`. El autor de los commits es `Claude Code (sesion nocturna)`; si quieres que figures tú, reescríbelo antes de publicar. Si prefieres el instalador completo de Git for Windows, puedes borrar esa carpeta.
 2. **Probar el MCP en Claude Code**: abre Claude Code en esta carpeta, acepta el servidor `crm` y pregunta "¿qué seguimientos tengo vencidos?". Si no arranca, el problema es que `uv` no está en el PATH (DECISIONES 29).
 3. Ver la web en el móvil (390 px).
 4. Arrastrar y soltar: retomarlo con Tailwind compilado en lugar del CDN (DECISIONES 27).
