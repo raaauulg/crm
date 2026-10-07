@@ -26,6 +26,7 @@ Configuration comes from environment variables or a `.env` file (see `.env.examp
 | `CRM_DB_PATH` | `data/crm.db` | SQLite database file. |
 | `CRM_HOST` / `CRM_PORT` | `127.0.0.1` / `8000` | Where the web app listens. |
 | `CRM_SECURE_COOKIES` | `false` | Set to `true` behind HTTPS. |
+| `CRM_MCP_TOKEN` | – | Enables the MCP server over HTTP at `/mcp` (bearer token, ≥ 32 chars). Unset = disabled. |
 | `CRM_VAULT_PATH` | – | Obsidian vault, only for `crm exportar-obsidian`. |
 
 ## Features
@@ -50,6 +51,16 @@ models (SQLAlchemy 2.0)  →  services (all business logic)  →  web (FastAPI +
 ```
 
 The web app, the CLI and the MCP server never touch the database directly: they all go through `crm.services`, so business rules are tested once. See `docs/GUIA.md` (Spanish) for a guided tour.
+
+## Deployment (optional)
+
+A `Dockerfile` is included. The image listens on `0.0.0.0:8000`, stores SQLite in `/data` (mount a persistent volume there) and runs migrations on start. With `CRM_MCP_TOKEN` set, the same MCP tools are served over Streamable HTTP at `/mcp`, so an MCP client can reach the deployed database:
+
+```bash
+claude mcp add --transport http crm-remote https://<host>/mcp --header "Authorization: Bearer <token>"
+```
+
+Run a **single replica**: SQLite on a network volume supports only one writer. Step-by-step guide for Azure Container Apps (in Spanish): `docs/DESPLIEGUE_AZURE.md`.
 
 ## Development
 

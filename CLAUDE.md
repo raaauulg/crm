@@ -138,7 +138,7 @@ Nunca se recortan: login, potenciales, clientes con MRR, facturas y cobros, MCP 
 
 ## 9. Fuera de alcance (esta versión)
 
-Despliegue en servidor, MCP remoto, buscador de leads (las reglas legales ya están en `internos/CLAUDE.md` y se detallarán al empezarlo), varios usuarios con roles, envío de correos o WhatsApp, emisión de facturas, recordatorios por notificación, sincronización bidireccional con Obsidian.
+~~Despliegue en servidor, MCP remoto~~ (adelantados por Raúl el 2026-10-07: Azure Container Apps y MCP por HTTP con token; ver `docs/DESPLIEGUE_AZURE.md` y `DECISIONES.md` 34–39; el MCP con OAuth para el móvil sigue fuera), buscador de leads (las reglas legales ya están en `internos/CLAUDE.md` y se detallarán al empezarlo), varios usuarios con roles, envío de correos o WhatsApp, emisión de facturas, recordatorios por notificación, sincronización bidireccional con Obsidian.
 
 ## 10. Comandos (cuando existan)
 
@@ -157,3 +157,4 @@ uv run pytest && uv run ruff check .
 |---|---|---|---|
 | 2026-10-07 | Requisitos y preparación | | |
 | 2026-10-07 | Sesión nocturna sin supervisión (agente): niveles 1, 2 y 3 (sin arrastrar y soltar). Ver `MANANA.md` | | Horas de agente, no cuentan; Raúl: revisión pendiente |
+| 2026-10-07 | Dockerfile, MCP por HTTP con token y guía de despliegue en Azure | | Raúl: desplegar y revisar |

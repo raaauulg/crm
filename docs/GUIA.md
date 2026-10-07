@@ -109,6 +109,9 @@ La base de datos tiene un esquema (tablas y columnas) que evoluciona. Alembic gu
 | HTMX + JS de terceros | La pestaña se congela al navegar | Visto en la prueba visual: sustituir por HTMX una página con gráficos de Chart.js, o cargar SortableJS en el kanban, congelaba Chrome. Por eso el dashboard va sin `hx-boost` y el kanban no tiene arrastrar y soltar (DECISIONES 26 y 27). Si añades JS de terceros, pruébalo navegando con HTMX, no solo con carga completa. |
 | MCP | Claude no ve el servidor | `.mcp.json` lanza `uv run crm-mcp`: `uv` tiene que estar en el PATH del proceso de Claude Code. Prueba a mano: `uv run crm-mcp` debe quedarse esperando (habla por stdin/stdout). |
 | MCP | Claude recibe "Error executing tool" | Una excepción que no es `ServiceError` (un bug). Mira el log de Claude Code; los errores previstos llegan con su mensaje. |
+| MCP por HTTP | Claude Code dice que no puede conectar o recibe 401 | Falta la variable `CRM_MCP_TOKEN` en tu PC, o no es igual al *secret* de Azure. Prueba: `claude mcp list`. Si la app estaba escalada a cero, la primera petición tarda unos segundos (arranque en frío). |
+| Azure | La app no arranca tras desplegar | Mira el log: `az containerapp logs show -n crm -g rg-crm --follow`. Típico: `CRM_MCP_TOKEN` demasiado corto, o el volumen `/data` no está montado. |
+| Azure | "database is locked" | SQLite sobre Azure Files (SMB). Comprueba que hay **una sola réplica** (máx. 1) y que el volumen lleva `mountOptions: nobrl`. |
 | Exportación | "no tiene los marcadores" | Faltan `<!-- crm:resumen:inicio -->` / `<!-- crm:resumen:fin -->` en `negocio/clientes_potenciales.md`, o están repetidos o al revés. No se escribe nada. |
 | Importación | Tildes rotas ("Ã³") | El CSV no es UTF-8 ni Windows-1252. Guárdalo desde Excel como "CSV UTF-8". |
 
@@ -131,6 +134,18 @@ Un protocolo para que un asistente como Claude use herramientas de un programa. 
 - No hay herramientas para borrar, enviar mensajes ni registrar facturas: lo que no existe, Claude no lo puede hacer.
 - Pruébalo: abre Claude Code en esta carpeta (lee `.mcp.json`) y pide "¿qué seguimientos tengo vencidos?".
 
+### MCP por HTTP (`/mcp`, para el servidor en Azure)
+
+Con stdio, Claude Code lanza el servidor como un proceso en tu PC, así que solo ve la base de datos de tu PC. Para usar la base de datos de Azure, el mismo servidor MCP se sirve **dentro de la web**, en la ruta `/mcp`, por *Streamable HTTP*: Claude manda cada mensaje JSON-RPC como un `POST` y recibe la respuesta en JSON. Ver `src/crm/web/mcp_http.py`.
+
+- **Mismo proceso que la web.** Hay un único proceso escribiendo en SQLite, y las herramientas usan la misma `session_factory` que las páginas.
+- **Solo se activa con `CRM_MCP_TOKEN`.** Sin token, `/mcp` no existe (404). Con un token de menos de 32 caracteres, la app no arranca.
+- **Token fijo (`Authorization: Bearer …`).** `BearerTokenGuard` es un *middleware ASGI*: una capa que ve la petición antes que el MCP y responde 401 si el token no coincide. Compara con `secrets.compare_digest`, que tarda lo mismo acierte o falle (así no da pistas sobre el token).
+- **Sin estado (`stateless_http=True`).** Cada petición es independiente, así que reiniciar el contenedor no deja a Claude con una sesión que ya no existe.
+- **`lifespan`.** El SDK necesita una tarea de fondo (`session_manager.run()`) mientras la app esté viva. FastAPI la abre al arrancar y la cierra al parar, con el `lifespan` de `create_app`.
+- **Por qué no se monta Azure Files en el PC para usar el MCP local:** el puerto SMB (445) suele estar bloqueado en casa, y serían dos procesos escribiendo en SQLite por internet. Es la receta para corromper la base de datos.
+- Despliegue paso a paso: `docs/DESPLIEGUE_AZURE.md`.
+
 ### Importación CSV (`crm importar`)
 
 `services/importer.py` primero **planifica** (`plan_import`: lee, mapea columnas, detecta duplicados y errores) y solo después escribe, en una transacción. `--dry-run` enseña el plan sin escribir. Las columnas se reconocen por sinónimos ("Razón social", "Localidad"…) o con `--columna name="Mi columna"`.
@@ -144,3 +159,4 @@ Solo toca el texto entre los dos marcadores. Lee el archivo como bytes, sustituy
 1. Si das de baja hoy un contrato con fecha de fin el 31/12, ¿cuánto baja el MRR hoy y por qué? ¿Qué función lo decide?
 2. Pulsas "Cambiar fase" en una ficha: ¿qué dos comprobaciones de seguridad pasan antes de que se ejecute `companies.change_phase`, y en qué archivo están?
 3. Claude llama por MCP a `cambiar_fase` con `6-Ganado`. ¿Qué ve Claude y por qué no ve "Error executing tool"?
+4. ¿Por qué el CRM en Azure no puede tener dos réplicas, y qué pasaría con la base de datos si las tuviera?

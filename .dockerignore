@@ -1,0 +1,23 @@
+# Nada de datos reales ni secretos dentro de la imagen
+data/
+**/*.db
+**/*.db-journal
+**/*.sqlite
+**/*.sqlite3
+exports/
+**/.env
+**/.env.*
+app.yaml
+
+# Ni entorno local, cachés o ajustes del PC
+.venv/
+.git/
+.claude/
+.mcp.json
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+docs/

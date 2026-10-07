@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     crm_vault_path: Path | None = None
     # Solo poner a True detrás de HTTPS (despliegue en servidor).
     crm_secure_cookies: bool = False
+    # Token del MCP por HTTP (/mcp). Vacío = /mcp desactivado (en local basta el MCP por stdio).
+    crm_mcp_token: str = ""
 
     @field_validator("crm_vault_path", mode="before")
     @classmethod

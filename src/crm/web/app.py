@@ -2,6 +2,8 @@
 
 import logging
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse, Response
@@ -14,6 +16,7 @@ from crm.db import default_session_factory
 from crm.services.catalog import ensure_default_catalog
 from crm.services.errors import NotFoundError
 from crm.web.deps import CsrfError, LoginRequired, login_redirect
+from crm.web.mcp_http import MCP_PATH, mcp_route
 from crm.web.routes import auth, catalog, clients, companies, dashboard, kanban
 
 logger = logging.getLogger(__name__)
@@ -36,7 +39,18 @@ def create_app(
     settings = settings or get_settings()
     factory = session_factory or default_session_factory()
 
-    app = FastAPI(title="CRM", docs_url=None, redoc_url=None, openapi_url=None)
+    mcp = mcp_route(settings.crm_mcp_token, factory) if settings.crm_mcp_token else None
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        if mcp is None:
+            yield
+            return
+        _route, mcp_lifespan = mcp
+        async with mcp_lifespan():
+            yield
+
+    app = FastAPI(title="CRM", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.session_factory = factory
     app.add_middleware(
         SessionMiddleware,
@@ -77,4 +91,8 @@ def create_app(
     app.include_router(clients.router)
     app.include_router(kanban.router)
     app.include_router(catalog.router)
+    if mcp is not None:
+        route, _lifespan = mcp
+        app.router.routes.append(route)
+        logger.info("MCP por HTTP activo en %s (con token).", MCP_PATH)
     return app
