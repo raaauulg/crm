@@ -21,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 crm = "crm.cli:app"
+crm-mcp = "crm.mcp_server:main"
 
 [dependency-groups]
 dev = [

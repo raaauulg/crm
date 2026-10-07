@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "crm": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "crm-mcp"],
+      "env": {}
+    }
+  }
+}
