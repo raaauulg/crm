@@ -146,9 +146,11 @@ Montar un volumen solo se puede hacer con un YAML:
 
 ```powershell
 $YAML = "$env:TEMP\crm-app.yaml"     # fuera del repositorio
-az containerapp show -n $APP -g $RG -o yaml > $YAML
-notepad $YAML
+[IO.File]::WriteAllLines($YAML, (az containerapp show -n $APP -g $RG -o yaml))   # UTF-8
+code $YAML                           # o cualquier editor de texto
 ```
+
+No uses `> $YAML`: en PowerShell 5.1 guarda el archivo en UTF-16, y `az` puede no leerlo.
 
 Haz tres cambios en el archivo:
 
