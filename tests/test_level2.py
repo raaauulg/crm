@@ -60,6 +60,100 @@ def test_monthly_revenue_series(session: Session) -> None:
     assert [m.mrr_cents for m in again] == [0, 12_000, 12_000, 12_000]
 
 
+def _contract(session: Session, end: date | None = None) -> int:
+    company = companies.create_company(session, CompanyInput(name="Con contrato"), "raul")
+    return clients.convert_to_client(
+        session,
+        company.id,
+        ContractInput(
+            service_id=_service_id(session),
+            setup_price_cents=0,
+            monthly_fee_cents=10_000,
+            start_date=date(2026, 1, 1),
+            end_date=end,
+        ),
+        "raul",
+    ).id
+
+
+def test_cancel_can_only_shorten_and_only_once(session: Session) -> None:
+    import pytest
+
+    from crm.services.errors import ServiceError
+
+    finished = _contract(session, end=date(2026, 6, 30))
+    with pytest.raises(ServiceError, match="posterior"):
+        clients.cancel_contract(session, finished, TODAY, "raul")
+    contract = clients.cancel_contract(session, finished, date(2026, 5, 31), "raul")
+    assert contract.end_date == date(2026, 5, 31)
+    with pytest.raises(ServiceError, match="ya está cancelado"):
+        clients.cancel_contract(session, finished, date(2026, 5, 1), "raul")
+
+
+def test_future_payment_dates_are_rejected(session: Session) -> None:
+    import pytest
+
+    from crm.services.errors import ServiceError
+
+    contract_id = _contract(session)
+    company_id = clients.get_contract(session, contract_id).company_id
+    tomorrow = date.fromordinal(today().toordinal() + 1)
+    data = InvoiceInput(
+        number="FUT-1",
+        issue_date=date(2026, 1, 1),
+        base_cents=100,
+        due_date=date(2026, 2, 1),
+        paid_date=tomorrow,
+    )
+    with pytest.raises(ServiceError, match="futura"):
+        clients.register_invoice(session, company_id, data, "raul")
+    invoice = clients.register_invoice(
+        session, company_id, data.model_copy(update={"paid_date": None}), "raul"
+    )
+    with pytest.raises(ServiceError, match="futura"):
+        clients.register_payment(session, invoice.id, tomorrow, "raul")
+
+
+def test_search_ignores_accents_and_like_wildcards(session: Session) -> None:
+    companies.create_company(session, CompanyInput(name="Panadería Ágreda"), "raul")
+    companies.create_company(session, CompanyInput(name="Taller 100% Soria"), "raul")
+    assert [c.name for c in companies.search_companies(session, text="panaderia agreda")] == [
+        "Panadería Ágreda"
+    ]
+    assert [c.name for c in companies.search_companies(session, text="ÁGREDA")] == [
+        "Panadería Ágreda"
+    ]
+    # "%" y "_" no son comodines: "_" se ignora como signo, no casa con cualquier letra.
+    assert companies.search_companies(session, text="%") == companies.search_companies(session)
+    assert companies.search_companies(session, text="p_n") == []
+
+
+def test_list_invoices_by_status(session: Session) -> None:
+    contract_id = _contract(session)
+    company_id = clients.get_contract(session, contract_id).company_id
+    for number, due, paid in (
+        ("A", date(2026, 9, 1), None),
+        ("B", date(2026, 12, 1), None),
+        ("C", date(2026, 9, 1), date(2026, 9, 2)),
+    ):
+        clients.register_invoice(
+            session,
+            company_id,
+            InvoiceInput(
+                number=number,
+                issue_date=date(2026, 8, 1),
+                base_cents=1,
+                due_date=due,
+                paid_date=paid,
+            ),
+            "raul",
+        )
+    by = clients.InvoiceStatus
+    assert [i.number for i in clients.list_invoices(session, status=by.OVERDUE, on=TODAY)] == ["A"]
+    assert [i.number for i in clients.list_invoices(session, status=by.PENDING, on=TODAY)] == ["B"]
+    assert [i.number for i in clients.list_invoices(session, status=by.PAID, on=TODAY)] == ["C"]
+
+
 def test_monthly_revenue_crosses_year_boundary(session: Session) -> None:
     series = dashboard.monthly_revenue(session, months=3, on=date(2027, 1, 10))
     assert [m.month for m in series] == ["2026-11", "2026-12", "2027-01"]

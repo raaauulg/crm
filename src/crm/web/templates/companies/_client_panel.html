@@ -12,19 +12,20 @@
     <div class="py-2 flex flex-wrap items-center justify-between gap-2 {{ 'border-t border-slate-100' if not loop.first }}">
       <div>
         <div class="font-medium">{{ c.service.name }}
-          {% if c.id in active_contract_ids %}<span class="ml-1 rounded bg-emerald-50 px-1.5 text-xs text-emerald-700">activo</span>
-          {% else %}<span class="ml-1 rounded bg-slate-100 px-1.5 text-xs text-slate-600">{{ c.status }}</span>{% endif %}
+          {% if c.id in active_contract_ids %}<span class="ml-1 rounded bg-emerald-50 px-1.5 text-xs text-emerald-700">activo{% if c.end_date %} hasta {{ c.end_date|fecha }}{% endif %}</span>
+          {% elif c.start_date > today %}<span class="ml-1 rounded bg-sky-50 px-1.5 text-xs text-sky-700">empieza el {{ c.start_date|fecha }}</span>
+          {% else %}<span class="ml-1 rounded bg-slate-100 px-1.5 text-xs text-slate-600">terminado</span>{% endif %}
         </div>
         <div class="text-sm text-slate-500">
           {{ c.setup_price_cents|euros }} + {{ c.monthly_fee_cents|euros }}/mes · desde {{ c.start_date|fecha }}{% if c.end_date %} hasta {{ c.end_date|fecha }}{% endif %}{% if c.commitment_months %} · permanencia {{ c.commitment_months }} meses{% endif %}
         </div>
       </div>
-      {% if c.status == "activo" %}
+      {% if c.status == "activo" and (c.end_date is none or c.end_date >= today) %}
         <form method="post" action="/contratos/{{ c.id }}/cancelar" class="flex items-center gap-2"
-              onsubmit="return confirm('¿Cancelar este contrato? Dejará de contar en el MRR desde la fecha de fin.')">
+              hx-confirm="¿Registrar la baja? Dejará de contar en el MRR después de la fecha de fin.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="date" name="end_date" value="{{ today.isoformat() }}" class="rounded-lg border border-slate-300 px-2 py-1 text-xs">
-          <button class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">Registrar baja</button>
         </form>
       {% endif %}
     </div>

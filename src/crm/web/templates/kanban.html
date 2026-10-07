@@ -43,7 +43,7 @@
                   <a href="/empresas/{{ c.id }}/convertir" class="rounded-md bg-emerald-600 px-2 py-0.5 text-sm text-white hover:bg-emerald-700">Ganar</a>
                 {% endif %}
                 <form method="post" action="/empresas/{{ c.id }}/fase" class="ml-auto"
-                      onsubmit="return confirm('¿Marcar esta empresa como perdida?')">
+                      hx-confirm="¿Marcar esta empresa como perdida?">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="phase" value="7-Perdido">
                   <input type="hidden" name="back" value="/kanban">

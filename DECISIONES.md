@@ -30,7 +30,8 @@ Cada entrada: **decisión**, motivo y alternativa descartada. Las marcadas con �
 
 9. ⭐ **Cambio de fase:** se puede ir a cualquier fase de 1 a 5 y a `7-Perdido` desde cualquier fase. **No** se puede ir a `0-Lead` (solo importación) ni a `6-Ganado` (solo con "Convertir en cliente", que crea el contrato). Un cliente con contratos activos no puede cambiar de fase hasta cancelarlos.
    *Descartado:* forzar un orden estricto 1→2→3… (en la vida real se saltan fases).
-10. **Contrato activo** = estado `activo`, fecha de inicio ≤ hoy y (sin fecha de fin o fin ≥ hoy). El día de fin cuenta como activo.
+10. ⭐ **Contrato activo = solo por fechas**: inicio ≤ hoy y (sin fin o fin ≥ hoy; el día de fin cuenta). El estado `cancelado` solo indica que la baja está registrada (siempre con fecha de fin). Motivo: una baja avisada hoy con fin el 31/12 debe seguir sumando al MRR hasta el 31/12, y el histórico de meses pasados no debe cambiar al cancelar. La baja solo puede **acortar** un contrato, nunca alargarlo, y no se puede cancelar dos veces.
+   *Descartado:* que `cancelado` saque el contrato del MRR al instante (falseaba el MRR y el histórico).
 11. **Factura:** `cobrada` si tiene fecha de cobro; `vencida` si no y el vencimiento es anterior a hoy; `pendiente` en el resto. El día del vencimiento todavía es `pendiente`.
 12. ⭐ **Dashboard de clientes:** "facturado" (mes/año) suma **bases imponibles** (sin IVA: el IVA no es ingreso). "Pendiente" y "vencido" suman **totales con IVA** (es lo que te deben). "Pendiente" excluye lo vencido; se muestran por separado.
 13. **"Seguimientos"** del dashboard: empresas no perdidas con próximo paso fechado; vencidos = fecha < hoy; próximos = hoy … hoy+7. Incluye clientes (también se les hace seguimiento).
@@ -45,3 +46,8 @@ Cada entrada: **decisión**, motivo y alternativa descartada. Las marcadas con �
 18. **Filtros de la tabla en vivo con HTMX**: si la petición trae `HX-Target: company-table`, se devuelve solo la tabla.
 19. **Cada función de escritura de `services` hace su propio `commit`.** Más simple para web, CLI y MCP. *Descartado:* commit en la dependencia de FastAPI (el orden de ejecución tras `yield` ha cambiado entre versiones de FastAPI).
 20. **Sesión de 14 días**; al entrar se limpia la sesión (evita fijación de sesión). `CRM_SECURE_COOKIES=true` activa la cookie `Secure` para cuando haya HTTPS.
+21. **Confirmaciones con `hx-confirm`** (baja de contrato, marcar como perdida) en lugar de `onsubmit="return confirm()"`, porque con `hx-boost` el `onsubmit` podría no frenar la petición. Sin JavaScript no hay confirmación (el formulario se envía directamente).
+22. **Un cliente con contratos vigentes o con baja futura no puede cambiar de fase** (ni a `7-Perdido`) hasta que terminen. La regla está escrita en `companies.change_phase` además de en `clients.contract_is_active` (no se puede importar `clients` desde `companies` sin un import circular). *Pendiente:* unificarlas en un módulo común.
+23. **`create_contract` admite servicios desactivados** (el formulario solo ofrece los activos). Así un contrato antiguo se puede registrar aunque el servicio ya no se venda.
+24. **La exportación a Obsidian reutiliza el formato español de `crm.web.formatting`** (módulo puro, sin dependencias web). Si molesta la dependencia de `services` hacia `web`, se mueve a `crm/text.py`.
+25. **Importación:** cabeceras reconocidas por sinónimos sin tildes ("Razón social", "Localidad", "E-mail"…) y `--columna campo=Cabecera` para forzar. CSV en UTF-8 o, si falla, Windows-1252 (Excel). Separador detectado (`,` `;` tabulador). Una sola transacción: o entra todo lo válido o nada. Las filas duplicadas o con errores se listan y se omiten. Excel (`.xlsx`) no se soporta: guárdalo como CSV desde Excel.

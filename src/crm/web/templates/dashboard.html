@@ -88,7 +88,7 @@
   {% set k = clients %}
   <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
     {{ ui.kpi("MRR", k.mrr_cents|euros, "Cuotas de contratos activos", "text-indigo-700") }}
-    {{ ui.kpi("Clientes", k.client_count) }}
+    {{ ui.kpi("Clientes", k.client_count, "Empresas en 6-Ganado") }}
     {{ ui.kpi("Facturado este mes", k.invoiced_month_cents|euros, "Base imponible") }}
     {{ ui.kpi("Facturado este año", k.invoiced_year_cents|euros, "Base imponible") }}
     {{ ui.kpi("Pendiente de cobro", k.pending_cents|euros, "IVA incluido; sin vencer", "text-amber-600" if k.pending_cents else "") }}

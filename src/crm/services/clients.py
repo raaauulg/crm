@@ -127,11 +127,16 @@ def get_invoice(session: Session, invoice_id: int) -> Invoice:
 
 
 def cancel_contract(session: Session, contract_id: int, end_date: date, actor: str) -> Contract:
-    contract = session.get(Contract, contract_id)
-    if contract is None:
-        raise NotFoundError(f"No existe el contrato {contract_id}.")
+    """Registra la baja: fija la fecha de fin. Solo puede acortar el contrato, nunca alargarlo."""
+    contract = get_contract(session, contract_id)
+    if contract.status == ContractStatus.CANCELLED.value:
+        raise ServiceError("El contrato ya está cancelado.")
     if end_date < contract.start_date:
         raise ServiceError("La fecha de fin no puede ser anterior a la de inicio.")
+    if contract.end_date is not None and end_date > contract.end_date:
+        raise ServiceError(
+            "La baja no puede ser posterior a la fecha de fin que ya tenía el contrato."
+        )
     contract.status = ContractStatus.CANCELLED.value
     contract.end_date = end_date
     contract.updated_by = actor
@@ -193,8 +198,17 @@ def register_payment(session: Session, invoice_id: int, paid_on: date, actor: st
     return invoice
 
 
-def list_invoices(session: Session, company_id: int | None = None) -> list[Invoice]:
+def list_invoices(
+    session: Session,
+    company_id: int | None = None,
+    status: InvoiceStatus | None = None,
+    on: date | None = None,
+) -> list[Invoice]:
+    """Facturas, las más recientes primero; opcionalmente de una empresa o en un estado."""
     query = select(Invoice).order_by(Invoice.issue_date.desc(), Invoice.id.desc())
     if company_id is not None:
         query = query.where(Invoice.company_id == company_id)
-    return list(session.scalars(query))
+    invoices = list(session.scalars(query))
+    if status is not None:
+        invoices = [i for i in invoices if invoice_status(i, on) is status]
+    return invoices

@@ -235,8 +235,8 @@ async def register_payment(
 def invoice_list(
     request: Request, estado: str = "", session: Session = Depends(get_session)
 ) -> Response:
-    rows = [(inv, clients.invoice_status(inv)) for inv in clients.list_invoices(session)]
-    if estado in {s.value for s in InvoiceStatus}:
-        rows = [(inv, st) for inv, st in rows if st.value == estado]
+    status = InvoiceStatus(estado) if estado in {s.value for s in InvoiceStatus} else None
+    invoices = clients.list_invoices(session, status=status)
+    rows = [(inv, clients.invoice_status(inv)) for inv in invoices]
     context = {"rows": rows, "estado": estado, "statuses": list(InvoiceStatus)}
     return render(request, "clients/invoices.html", context)

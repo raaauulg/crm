@@ -29,11 +29,15 @@ def service_list(request: Request, session: Session = Depends(get_session)) -> R
 async def _save(request: Request, session: Session, service_id: int | None) -> Response:
     form = await request.form()
     try:
+        setup = form_euros(form, "setup_price")
+        fee = form_euros(form, "monthly_fee")
+        if service_id and (setup is None or fee is None):
+            raise ServiceError("Escribe los dos precios (pon 0 si no hay).")
         service = catalog.save_service(
             session,
             name=form_str(form, "name"),
-            setup_price_cents=form_euros(form, "setup_price") or 0,
-            monthly_fee_cents=form_euros(form, "monthly_fee") or 0,
+            setup_price_cents=setup or 0,
+            monthly_fee_cents=fee or 0,
             active=form_bool(form, "active") if service_id else True,
             service_id=service_id,
         )
