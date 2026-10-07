@@ -6,7 +6,7 @@
   <h1 class="text-2xl font-semibold tracking-tight">Inicio</h1>
   <div class="inline-flex rounded-xl bg-slate-200/70 p-1 text-sm">
     {% for key, label in [("potenciales", "Potenciales"), ("clientes", "Clientes")] %}
-      <a href="/?tab={{ key }}"
+      <a href="/?tab={{ key }}" hx-boost="false"
          class="rounded-lg px-4 py-1.5 font-medium {{ 'bg-white shadow-sm text-slate-900' if tab == key else 'text-slate-600 hover:text-slate-900' }}">{{ label }}</a>
     {% endfor %}
   </div>
@@ -116,7 +116,8 @@
       const months = {{ monthly|map(attribute="month")|list|tojson }};
       const fmt = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
       const label = m => { const [y, mo] = m.split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString("es-ES", { month: "short" }); };
-      const common = {
+      /* Una copia de las opciones por gráfico: Chart.js las modifica y no deben compartirse. */
+      const makeOptions = () => ({
         maintainAspectRatio: false, animation: false,
         interaction: { mode: "index", intersect: false },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => " " + fmt.format(c.parsed.y) } } },
@@ -124,7 +125,7 @@
           x: { ticks: { color: "#64748b" }, grid: { display: false }, border: { display: false } },
           y: { beginAtZero: true, ticks: { color: "#64748b", callback: v => fmt.format(v) }, grid: { color: "#f1f5f9" }, border: { display: false } }
         }
-      };
+      });
       const series = {
         "mrr-chart": { type: "line", data: {{ monthly|map(attribute="mrr_cents")|list|tojson }} },
         "revenue-chart": { type: "bar", data: {{ monthly|map(attribute="invoiced_cents")|list|tojson }} }
@@ -135,7 +136,7 @@
         const dataset = s.type === "line"
           ? { data: s.data.map(c => c / 100), borderColor: "#4f46e5", backgroundColor: "#4f46e5", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.25 }
           : { data: s.data.map(c => c / 100), backgroundColor: "#6366f1", borderRadius: 4, borderSkipped: "start", barPercentage: 0.7 };
-        new Chart(el, { type: s.type, data: { labels: months.map(label), datasets: [dataset] }, options: common });
+        new Chart(el, { type: s.type, data: { labels: months.map(label), datasets: [dataset] }, options: makeOptions() });
       }
     })();
   </script>

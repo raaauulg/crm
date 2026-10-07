@@ -317,3 +317,9 @@ def test_dashboard_clients_tab_has_charts(
     html = auth_client.get("/?tab=clientes").text
     assert 'id="mrr-chart"' in html and 'id="revenue-chart"' in html
     assert 'id="funnel-chart"' in auth_client.get("/").text
+
+
+def test_dashboard_is_not_boosted_but_other_pages_are(auth_client: TestClient) -> None:
+    # Sustituir por HTMX una página con gráficos colgaba Chrome: el dashboard va sin hx-boost.
+    assert 'hx-boost="false"\n      hx-headers' in auth_client.get("/").text
+    assert 'hx-boost="true"\n      hx-headers' in auth_client.get("/empresas").text

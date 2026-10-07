@@ -16,7 +16,13 @@ def home(
     request: Request, tab: str = "potenciales", session: Session = Depends(get_session)
 ) -> Response:
     tab = tab if tab in ("potenciales", "clientes") else "potenciales"
-    context: dict[str, object] = {"tab": tab, "upcoming_days": UPCOMING_DAYS}
+    # Sin hx-boost en el dashboard: sustituir por HTMX una página con gráficos de Chart.js
+    # bloqueaba el navegador (visto en Chrome). Entrar y salir de aquí recarga la página.
+    context: dict[str, object] = {
+        "tab": tab,
+        "upcoming_days": UPCOMING_DAYS,
+        "no_boost": True,
+    }
     if tab == "potenciales":
         context["pipeline"] = dashboard.pipeline_summary(session)
     else:

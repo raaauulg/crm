@@ -11,7 +11,7 @@
   {% block head %}{% endblock %}
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased"
-      hx-boost="true"
+      hx-boost="{{ 'false' if no_boost|default(false) else 'true' }}"
       hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
 {% set nav = nav_items %}
 <div class="min-h-screen md:flex">
@@ -23,7 +23,7 @@
     <nav class="flex-1 px-3 space-y-1">
       {% for href, label, icon in nav %}
         {% set active = (path == href) or (href != "/" and path.startswith(href)) %}
-        <a href="{{ href }}"
+        <a href="{{ href }}" {% if href == "/" %}hx-boost="false"{% endif %}
            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium {{ 'bg-indigo-50 text-indigo-700' if active else 'text-slate-600 hover:bg-slate-100' }}">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
           {{ label }}
@@ -65,7 +65,7 @@
   <nav class="md:hidden fixed bottom-0 inset-x-0 z-10 bg-white border-t border-slate-200 flex justify-around">
     {% for href, label, icon in nav %}
       {% set active = (path == href) or (href != "/" and path.startswith(href)) %}
-      <a href="{{ href }}" class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs {{ 'text-indigo-600' if active else 'text-slate-500' }}">
+      <a href="{{ href }}" {% if href == "/" %}hx-boost="false"{% endif %} class="flex flex-col items-center gap-0.5 px-3 py-2 text-xs {{ 'text-indigo-600' if active else 'text-slate-500' }}">
         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
         {{ label }}
       </a>
