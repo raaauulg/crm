@@ -7,65 +7,81 @@ actualizado: 2026-10-07
 
 # Para mañana
 
-> La sesión se cortó por **límite de uso**: no dio tiempo al nivel 3, a la revisión del nivel 2 ni a `/cierre-sesion`.
+Sesión nocturna terminada: **niveles 1, 2 y 3 hechos**, salvo el arrastrar y soltar del kanban, que probé y retiré. Cada nivel pasó por el `tester` y el `revisor-codigo`; se corrigió todo lo crítico (no hubo) y lo importante. Hay 236 tests en verde y `ruff` y `mypy` están limpios.
 
 ## 1. Qué funciona
 
-**Nivel 1** ✅ (tests en verde, revisado por `tester` y `revisor-codigo`, críticos e importantes corregidos)
-- ✅ Modelo completo y migración `0001`; login y logout, rutas protegidas y CSRF.
-- ✅ `crm demo` con 25 empresas inventadas, 4 clientes, contratos y facturas (una vencida).
-- ✅ Dashboard con las pestañas Potenciales y Clientes; tabla con filtros HTMX y búsqueda sin tildes; ficha y formularios.
+**Nivel 1**
+- ✅ Modelo completo (§3) y migración `0001` (con un test que comprueba que coincide con los modelos).
+- ✅ Login y logout, rutas protegidas, CSRF, cookie `HttpOnly`/`SameSite=Lax`, contraseñas argon2.
+- ✅ `crm demo`: 25 empresas inventadas, 4 clientes con contratos y facturas (una vencida).
+- ✅ Dashboard con las pestañas Potenciales y Clientes y todas sus cifras.
+- ✅ Tabla de empresas con filtros en vivo (HTMX) y búsqueda sin tildes; ficha con contactos, notas e historial; formularios.
 
-**Nivel 2** ⚠️ (hecho y con tests, `pytest` en verde, pero **sin la revisión de los subagentes y sin verlo en el navegador**)
+**Nivel 2**
 - ✅ Convertir en cliente, contratos y bajas, registro de facturas y cobros, página `/facturas`, catálogo editable en `/servicios`.
 - ✅ Kanban con botones ← → / Ganar / ✕.
-- ⚠️ Gráficos con Chart.js: un embudo, el MRR y lo facturado por mes. No los he visto renderizados.
-- ⚠️ Adaptación a 390 px: el diseño la tiene en cuenta, pero no está comprobada en pantalla.
+- ✅ Gráficos: embudo, MRR por mes y facturado por mes (vistos en Chrome).
+- ⚠️ Móvil a 390 px: el diseño lo contempla (menú inferior, tablas con scroll propio), pero **no lo he podido ver**: Chrome no cambió el tamaño de la ventana.
 
-**Nivel 3** ❌ Falta el MCP, `crm importar`, `crm exportar-obsidian` y el arrastrar y soltar.
+**Nivel 3**
+- ✅ Servidor MCP (`crm-mcp`) con las 9 herramientas de la §6 y `.mcp.json`. Probado en proceso y por stdio real con JSON-RPC.
+- ⚠️ El MCP **no está probado desde Claude Code real**.
+- ✅ `crm importar archivo.csv [--dry-run] [--columna campo=Cabecera]`.
+- ✅ `crm exportar-obsidian [--dry-run]`, probado solo con bóvedas temporales.
+- ❌ Arrastrar y soltar en el kanban: SortableJS congelaba Chrome. Retirado (DECISIONES 27).
 
-## 2. Cómo verlo (PowerShell)
-
-`uv` está en `%USERPROFILE%\.local\bin`, que no está en el PATH de PowerShell. En la misma sesión de PowerShell, antes de los comandos:
+## 2. Cómo verlo (PowerShell, en esta carpeta)
 
 ```powershell
-$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-uv sync; uv run alembic upgrade head
-uv run crm crear-usuario raul; uv run crm demo
-uv run crm serve   # http://127.0.0.1:8000
+$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"   # uv no está en el PATH de PowerShell
+uv sync; uv run alembic upgrade head; uv run crm crear-usuario raul
+uv run crm demo; uv run crm serve                      # http://127.0.0.1:8000
 ```
 
-Pon `SECRET_KEY` en `.env`: si no está, la sesión se pierde cada vez que reinicias el servidor.
+Antes, crea `.env` a partir de `.env.example` y pon una `SECRET_KEY`. Sin ella, la sesión se pierde cada vez que reinicias el servidor.
+
+Para pasar a datos reales después de mirar la demo: borra `data/crm.db` (solo contiene la demo), vuelve a ejecutar `alembic upgrade head` y crea el usuario. No uses `crm demo` sobre la base real.
 
 ## 3. Qué revisar primero
 
-1. `src/crm/services/clients.py`: `contract_is_active` y MRR. El estado del contrato lo deciden solo las fechas.
-2. `src/crm/web/deps.py`: CSRF, `require_user`, `redirect` con HTMX y `safe_path`.
-3. `src/crm/services/dashboard.py`: qué suma cada cifra (bases o totales).
-4. `src/crm/services/companies.py`: `change_phase`, con las transiciones permitidas.
-5. `src/crm/services/money.py`: `parse_euros`.
+1. `src/crm/services/clients.py`: `contract_is_active`, el MRR y los estados de factura. Es la lógica de dinero.
+2. `src/crm/web/deps.py`: login obligatorio, CSRF, `redirect` con HTMX y `safe_path`.
+3. `src/crm/services/companies.py`: `change_phase`, con las transiciones permitidas (DECISIONES 9 y 22).
+4. `src/crm/mcp_server.py`: qué puede hacer Claude y qué datos ve (DECISIONES 30, privacidad).
+5. `src/crm/services/export_obsidian.py`: lo único que escribe en tu bóveda.
 
-## 4. Pendiente, por prioridad
+## 4. Pendiente y deuda técnica (por prioridad)
 
-1. Revisión del nivel 2 con `revisor-codigo` y `tester`. Abrir la app en el navegador, en escritorio y a 390 px.
-2. Nivel 3: el MCP (verifica antes la API del paquete `mcp`), importar CSV y exportar a Obsidian con `--dry-run`.
-3. **Git:** no hay `git` instalado. Los commits se hicieron con `dulwich`; el `.git` es estándar. Instala Git y revisa el log.
-4. Deuda técnica:
-   - Las librerías de CDN no llevan SRI.
-   - La sesión vive en la cookie (sin estado) y no hay límite de intentos de login.
-   - Falta `mypy` en las dependencias de desarrollo.
-   - Avisos `httpx` → `httpx2` en los tests.
-5. `docs/GUIA.md`: falta añadir el nivel 2 (kanban, contratos, gráficos).
-6. Falta rellenar el registro de horas de `CLAUDE.md`.
+1. **Instalar Git.** Los commits se hicieron con `dulwich` porque no había `git`; el `.git` es estándar. Revisa `git log` antes del primer push. El autor es `Claude Code (sesion nocturna)`; si quieres que figures tú, reescríbelo antes de publicar.
+2. **Probar el MCP en Claude Code**: abre Claude Code en esta carpeta, acepta el servidor `crm` y pregunta "¿qué seguimientos tengo vencidos?". Si no arranca, el problema es que `uv` no está en el PATH (DECISIONES 29).
+3. Ver la web en el móvil (390 px).
+4. Arrastrar y soltar: retomarlo con Tailwind compilado en lugar del CDN (DECISIONES 27).
+5. Deuda técnica:
+   - Tailwind, HTMX y Chart.js por CDN, sin SRI. Antes de desplegar, servirlos en local.
+   - La sesión vive en la cookie y no hay límite de intentos de login. Aceptable en `127.0.0.1`; no en un servidor.
+   - La regla de "contrato vigente" está en dos sitios (DECISIONES 22).
+   - `services` importa el formato de `crm.web.formatting` (DECISIONES 24).
+   - La exportación no detecta que edites la nota en Obsidian justo en el mismo segundo.
+   - Aviso `httpx` → `httpx2` en los tests (Starlette 1.x).
 
 ## 5. Decisiones que quizá quieras cambiar
 
-Las de `DECISIONES.md` marcadas con ⭐: commits con dulwich, transiciones de fase, y facturado como base frente a pendiente con IVA.
+Las tienes todas en `DECISIONES.md`, marcadas con ⭐:
 
-Hay además una decisión nueva que aún no está en `DECISIONES.md`: un contrato cuenta como activo **solo por sus fechas**. "Cancelado" significa que la baja ya está registrada, y sigue sumando al MRR hasta la fecha de fin.
+- **9:** a qué fases se puede mover una empresa.
+- **10:** un contrato es activo solo por sus fechas; "cancelado" significa baja registrada.
+- **12:** "facturado" suma bases sin IVA; "pendiente" y "vencido" suman con IVA.
+- **26:** el dashboard se carga sin HTMX.
+- **27:** sin arrastrar y soltar.
+- **30:** el MCP envía teléfonos y emails de los contactos a Claude.
 
 ## 6. Avisos
 
-- Nada del nivel 2 se ha visto en un navegador.
-- La base de datos real (`data/crm.db`) no existe todavía. Las pruebas usaron una base temporal.
-- Puede quedar un servidor de prueba en el puerto 8765. Si sigue abierto, ciérralo: `Stop-Process -Name crm`.
+- **No verificado:**
+  - El MCP desde Claude Code real.
+  - La vista móvil.
+  - Las confirmaciones con `hx-confirm` (baja de contrato y marcar como perdida) en el navegador.
+- He descargado Python 3.12 con `uv` (en la carpeta de usuario de `uv`, no es una instalación del sistema).
+- La bóveda real no se ha tocado en ningún momento.
+- La base de datos real `data/crm.db` no existe todavía: todas las pruebas usaron bases temporales.

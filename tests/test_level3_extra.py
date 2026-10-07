@@ -25,7 +25,7 @@ from crm.cli import app as cli_app
 from crm.config import get_settings
 from crm.db import make_engine
 from crm.mcp_server import build_server
-from crm.models import Base, Company, Contact, Phase, Service
+from crm.models import Base, Channel, Company, Contact, Phase, Service
 from crm.services import clients, companies, demo, importer
 from crm.services import export_obsidian as export
 from crm.services.clients import ContractInput
@@ -205,12 +205,12 @@ NON_ASCII_NOTES = {
         "---\ntipo: pipeline\nactualizado: 2026-10-07\n---\n"
         "# Clientes potenciales — Soria\n\n«Notas mías» con tildes: Ágreda, Ólvega, señal.\n\n"
         f"{START}\nviejo\n{END}\n\nDespués: año, pingüino, café ☕.\n"
-    ).encode("utf-8"),
+    ).encode(),
     "crlf_sin_salto_final": (
         f"# Pipeline\r\nAntes ñ é ü\r\n\r\n{START}\r\nviejo\r\n{END}\r\nFin — sin salto"
-    ).encode("utf-8"),
-    "mixto": (f"línea uno\r\nlínea dos\nñ\r\n{START}\n{END}\r\nfin ñ\n").encode("utf-8"),
-    "misma_linea": (f"Antes → {START}{END} después ñ\n").encode("utf-8"),
+    ).encode(),
+    "mixto": (f"línea uno\r\nlínea dos\nñ\r\n{START}\n{END}\r\nfin ñ\n").encode(),
+    "misma_linea": (f"Antes → {START}{END} después ñ\n").encode(),
 }
 
 
@@ -268,20 +268,21 @@ def test_export_touches_no_other_file_and_no_database_row(
     session: Session, session_factory: sessionmaker[Session], tmp_path: Path
 ) -> None:
     demo.load_demo(session, on=TODAY)
-    write_note(tmp_path, f"# Pipeline\n{START}\n{END}\n".encode())
-    other = tmp_path / "negocio" / "otra_nota.md"
+    vault = tmp_path / "boveda"  # aparte de test.db, que también vive en tmp_path
+    write_note(vault, f"# Pipeline\n{START}\n{END}\n".encode())
+    other = vault / "negocio" / "otra_nota.md"
     other.write_bytes("No me toques: ñ\r\n".encode())
-    home = tmp_path / "00_Inicio.md"
+    home = vault / "00_Inicio.md"
     home.write_bytes(b"# Inicio\n")
-    files_before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    files_before = {p: p.read_bytes() for p in vault.rglob("*") if p.is_file()}
     db_before = dump(session_factory)
 
-    export.export_summary(session, tmp_path, dry_run=True, on=TODAY)
-    files_after_dry = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    export.export_summary(session, vault, dry_run=True, on=TODAY)
+    files_after_dry = {p: p.read_bytes() for p in vault.rglob("*") if p.is_file()}
     assert files_after_dry == files_before
 
-    export.export_summary(session, tmp_path, on=TODAY)
-    files_after = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    export.export_summary(session, vault, on=TODAY)
+    files_after = {p: p.read_bytes() for p in vault.rglob("*") if p.is_file()}
     assert set(files_after) == set(files_before)
     assert other.read_bytes() == files_before[other]
     assert home.read_bytes() == files_before[home]
@@ -344,7 +345,7 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 def test_cli_import_file_with_bom(cli_env: Path) -> None:
     path = cli_env / "leads.csv"
-    path.write_bytes(UTF8_BOM + "Nombre;Localidad\nBar Inventado;Duruelo de la Sierra\n".encode())
+    path.write_bytes(UTF8_BOM + b"Nombre;Localidad\nBar Inventado;Duruelo de la Sierra\n")
     result = CliRunner().invoke(cli_app, ["importar", str(path)])
     assert result.exit_code == 0, result.output
     assert "name←Nombre" in result.output

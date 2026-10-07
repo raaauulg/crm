@@ -109,6 +109,14 @@ def test_invalid_row_is_skipped_and_the_rest_imported(session: Session) -> None:
     assert count(session) == 2
 
 
+def test_row_with_extra_columns_is_reported_not_truncated(session: Session) -> None:
+    text = "Empresa;Municipio\nBien Hecha;Soria\nMal;Hecha;Soria\n"
+    report = importer.run_import(session, text, dry_run=True)
+    assert [r.company.name for r in report.to_create] == ["Bien Hecha"]
+    assert report.errors and report.errors[0][0] == 3
+    assert "más columnas" in report.errors[0][1]
+
+
 def test_import_is_all_or_nothing(session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     def broken_commit() -> None:
         raise RuntimeError("disco lleno (simulado)")

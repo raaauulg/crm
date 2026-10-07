@@ -98,16 +98,30 @@ def build_mapping(headers: list[str], overrides: dict[str, str] | None = None) -
     return mapping
 
 
+class _SingleColumn(csv.excel):
+    """Archivo de una sola columna: cada línea entera es un valor (las comas no separan)."""
+
+    delimiter = "\x1f"  # separador de unidades ASCII: no aparece en un CSV normal
+
+
+def _detect_dialect(text: str) -> type[csv.Dialect] | csv.Dialect:
+    header = text.split("\n", 1)[0]
+    if not any(sep in header for sep in ",;\t"):
+        return _SingleColumn
+    try:
+        return csv.Sniffer().sniff(text[:4096], delimiters=",;\t")
+    except csv.Error:
+        # Excel en español usa ";"; si la cabecera lo tiene, es la mejor apuesta.
+        if ";" in header:
+            return type("_Semicolon", (csv.excel,), {"delimiter": ";"})
+        return csv.excel
+
+
 def plan_import(
     session: Session, text: str, overrides: dict[str, str] | None = None
 ) -> ImportReport:
     """Analiza el CSV sin escribir nada."""
-    sample = text[:4096]
-    try:
-        dialect: type[csv.Dialect] | csv.Dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
-    except csv.Error:
-        dialect = csv.excel
-    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    reader = csv.DictReader(io.StringIO(text), dialect=_detect_dialect(text))
     headers = [h for h in (reader.fieldnames or []) if h]
     report = ImportReport(mapping=build_mapping(headers, overrides))
 
@@ -115,6 +129,11 @@ def plan_import(
     seen: dict[str, int] = {}
     for row in reader:
         line = reader.line_num  # línea real del archivo (aunque haya campos de varias líneas)
+        if row.get(None):  # type: ignore[call-overload]  # campos sobrantes del DictReader
+            report.errors.append(
+                (line, "La fila tiene más columnas que la cabecera (¿una coma o ; sin comillas?).")
+            )
+            continue
         values = {f: (row.get(h) or "").strip() for f, h in report.mapping.items()}
         name = values.get("name", "")
         if not name:

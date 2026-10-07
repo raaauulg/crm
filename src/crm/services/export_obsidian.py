@@ -53,7 +53,8 @@ def render_summary(session: Session, on: date | None = None, newline: str = "\n"
     """Bloque Markdown que va entre los marcadores (sin los marcadores)."""
     on = on or today()
     companies = list(session.scalars(select(Company).order_by(Company.phase, Company.name)))
-    potentials = [c for c in companies if c.phase not in (Phase.WON.value, Phase.LOST.value)]
+    # Potenciales = fases 0-5 y 7 (§3 de CLAUDE.md); las perdidas salen al final por el orden.
+    potentials = [c for c in companies if c.phase != Phase.WON.value]
     clients = [c for c in companies if c.phase == Phase.WON.value]
 
     lines = [
