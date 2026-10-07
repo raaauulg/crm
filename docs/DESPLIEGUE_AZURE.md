@@ -17,7 +17,7 @@ Claude Code (PC) ──HTTPS + token──▶   ├─ /      web
                                      /data/crm.db  ← Azure Files (persistente)
 ```
 
-Comandos para **PowerShell** en tu PC, desde la carpeta del proyecto. No hace falta Docker: la imagen se construye en Azure.
+Comandos para **PowerShell** en tu PC, desde la carpeta del proyecto. No hace falta Docker: la imagen se construye en GitHub Actions y se publica en `ghcr.io`.
 
 ## Reglas que no se tocan
 
@@ -33,14 +33,13 @@ az login
 az extension add --name containerapp --upgrade
 az provider register --namespace Microsoft.App
 az provider register --namespace Microsoft.OperationalInsights
-az provider register --namespace Microsoft.ContainerRegistry
 az provider register --namespace Microsoft.Storage
 ```
 
 El registro tarda uno o dos minutos. Comprueba que pone `Registered` antes de seguir:
 
 ```powershell
-az provider show -n Microsoft.ContainerRegistry --query registrationState -o tsv
+az provider show -n Microsoft.App --query registrationState -o tsv
 ```
 
 ## 1. Variables
@@ -101,31 +100,45 @@ $MCP_TOKEN = uv run python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 Guarda `$MCP_TOKEN` en tu gestor de contraseñas: lo necesitas en el paso 8.
 
-## 5. Construir y crear la app
+## 5. Construir la imagen (GitHub) y crear la app
 
-Primero, un **Azure Container Registry** (ACR) donde guardar la imagen, y la imagen construida en Azure con el `Dockerfile`:
+La imagen **se construye en GitHub Actions** y se publica en `ghcr.io`. Azure solo la descarga. Motivo: en la suscripción de estudiante no se puede construir dentro de Azure (ACR Tasks está bloqueado y crear un registro choca con la política de regiones; ver `DECISIONES.md` 39).
+
+**5.1. Subir el repositorio a GitHub** (una vez). Crea un repositorio vacío en github.com, sin README, y luego:
 
 ```powershell
-$ACR = "crmacr$(Get-Random -Maximum 99999)"     # único en Azure; apúntalo
-az acr create --resource-group $RG --name $ACR --location $LOC --sku Basic --admin-enabled true
-az acr build --registry $ACR --image crm:v1 .
+git status                                   # nada de data/, .env ni secrets.md
+git remote add origin https://github.com/<tu-usuario>/<repo>.git
+git push -u origin master
 ```
 
-Después, la app con su imagen, los secretos y como máximo 1 réplica, todo en un solo comando:
+Cada push a `master` o `main` lanza `.github/workflows/imagen.yml`. El workflow pasa los tests y `ruff` y, si van bien, publica `ghcr.io/<tu-usuario>/<repo>:<commit>` y `:latest`. Sigue el progreso en la pestaña **Actions** del repositorio.
+
+**5.2. Hacer pública la imagen** (una vez, tras el primer build). En GitHub: tu perfil → **Packages** → el paquete → **Package settings** → **Change visibility** → **Public**. La imagen solo lleva el código, que ya es público: nada de datos ni secretos.
+
+> Si prefieres la imagen privada, crea un token de GitHub (*classic*) con permiso `read:packages` y dáselo a Azure:
+> `az containerapp registry set -n $APP -g $RG --server ghcr.io --username <tu-usuario> --password <token>`
+
+**5.3. Crear la app** con la imagen, los secretos y como máximo 1 réplica:
 
 ```powershell
+$IMAGE = "ghcr.io/<tu-usuario>/<repo>"       # en minúsculas
+$TAG = git rev-parse --short=7 HEAD          # el commit que construyó Actions
 az containerapp create --name $APP --resource-group $RG --environment $ENV_NAME `
-  --image "$ACR.azurecr.io/crm:v1" --registry-server "$ACR.azurecr.io" `
+  --image "${IMAGE}:$TAG" `
   --target-port 8000 --ingress external --min-replicas 0 --max-replicas 1 `
   --secrets "secret-key=$SECRET_KEY" "mcp-token=$MCP_TOKEN" `
   --env-vars "SECRET_KEY=secretref:secret-key" "CRM_MCP_TOKEN=secretref:mcp-token"
 ```
 
-La CLI toma sola el usuario y la contraseña del registro (por eso `--admin-enabled true`).
+Si la app ya existe (por ejemplo, creada con una imagen de prueba), en vez de `create`:
 
-> No uses `az containerapp up --source .`: con las versiones recientes de la CLI construye con *Cloud Build* (preview) y falla con `ResourceNotFound` si la app todavía no existe.
->
-> Si `az acr build` falla con un error de *Tasks* no permitidas (pasa en algunas suscripciones de estudiante o de prueba), pásame el mensaje: la alternativa es construir la imagen en GitHub Actions.
+```powershell
+az containerapp update -n $APP -g $RG --image "${IMAGE}:$TAG"
+az containerapp ingress update -n $APP -g $RG --target-port 8000
+```
+
+> No uses `az containerapp up --source .` ni `az acr build`: en esta suscripción fallan (*Cloud Build* da `ResourceNotFound`, ACR Tasks da `TasksOperationsNotAllowed` y crear un registro da `RequestDisallowedByAzure`).
 
 ## 6. Montar el volumen `/data`
 
@@ -164,16 +177,13 @@ Remove-Item $YAML
 az containerapp secret list -n $APP -g $RG -o table
 ```
 
-Deben salir `secret-key`, `mcp-token` y el de la contraseña del registro (algo como `<registro>azurecrio-<registro>`). Si falta alguno:
+Deben salir `secret-key` y `mcp-token`. Con la imagen privada, sale también el de `ghcr.io`. Si falta alguno:
 
-- `secret-key` o `mcp-token`: repite el `az containerapp secret set` del paso 5 (con las mismas variables).
-- El del registro: vuelve a conectarlo:
-  ```powershell
-  $ACR = az acr list -g $RG --query "[0].name" -o tsv
-  az containerapp registry set -n $APP -g $RG --server "$ACR.azurecr.io" `
-    --username (az acr credential show -n $ACR --query username -o tsv) `
-    --password (az acr credential show -n $ACR --query "passwords[0].value" -o tsv)
-  ```
+```powershell
+az containerapp secret set -n $APP -g $RG --secrets "secret-key=$SECRET_KEY" "mcp-token=$MCP_TOKEN"
+```
+
+Si faltaba el de `ghcr.io`, repite el `az containerapp registry set` del paso 5.2.
 
 ## 7. Crear tu usuario y entrar
 
@@ -208,12 +218,16 @@ claude mcp list
 
 Lo mismo vale para cualquier `az containerapp update` cuando ya tienes datos.
 
+1. `git push`. Espera a que el workflow salga en verde en **Actions**. Si fallan los tests, no se publica nada.
+2. Pasa a Azure la imagen nueva:
+
 ```powershell
-$ACR = az acr list -g $RG --query "[0].name" -o tsv
-$TAG = Get-Date -Format "yyyyMMdd-HHmm"
-az acr build --registry $ACR --image "crm:$TAG" .
-az containerapp update -n $APP -g $RG --image "$ACR.azurecr.io/crm:$TAG"
+$IMAGE = "ghcr.io/<tu-usuario>/<repo>"
+$TAG = git rev-parse --short=7 HEAD
+az containerapp update -n $APP -g $RG --image "${IMAGE}:$TAG"
 ```
+
+Usa la etiqueta del commit, no `:latest`. Con la misma etiqueta, Azure no siempre crea una revisión nueva, y así además sabes qué versión está desplegada.
 
 Las migraciones se aplican solas al arrancar (`alembic upgrade head` en el `CMD` del `Dockerfile`).
 
@@ -246,7 +260,7 @@ Precios orientativos; compruébalos en la calculadora de Azure:
 | Recurso | Coste |
 |---|---|
 | Container Apps (consumo, escala a 0, un usuario) | ~0 €: cabe en la capa gratuita mensual |
-| Container Registry Basic | ~5 €/mes. Es lo que más pesa. |
+| Imagen en `ghcr.io` + GitHub Actions | 0 € (repositorio y paquete públicos) |
 | Azure Files (1 GiB) | céntimos |
 | Log Analytics (logs) | céntimos con este volumen |
 
@@ -258,6 +272,8 @@ Con `--min-replicas 0`, la primera petición tras un rato sin uso tarda unos seg
 |---|---|
 | Error de política o región al crear recursos | Las suscripciones de estudiante limitan las regiones. Cambia `$LOC` por otra región de la UE. |
 | La app no arranca | `az containerapp logs show -n $APP -g $RG --follow`. Típico: `CRM_MCP_TOKEN` corto, o falta el volumen. |
+| Azure no puede descargar la imagen (`unauthorized`, `denied`, `manifest unknown`) | El paquete de `ghcr.io` sigue privado (paso 5.2), la ruta no está en minúsculas, o la etiqueta no existe (¿terminó el workflow de ese commit?). |
+| El workflow de Actions falla | Abre el paso en rojo. Si falla en "Tests y lint", es lo mismo que `uv run pytest` / `uv run ruff check .` en local. |
 | Te echa del login a menudo | Falta `SECRET_KEY` (paso 5). |
 | Claude recibe 401 | El token de `claude mcp add` no es igual al secret `mcp-token`. |
 | "database is locked" | Más de una réplica, o falta `mountOptions: nobrl` (paso 6). |

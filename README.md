@@ -60,7 +60,7 @@ A `Dockerfile` is included. The image listens on `0.0.0.0:8000`, stores SQLite i
 claude mcp add --transport http crm-remote https://<host>/mcp --header "Authorization: Bearer <token>"
 ```
 
-Run a **single replica**: SQLite on a network volume supports only one writer. Step-by-step guide for Azure Container Apps (in Spanish): `docs/DESPLIEGUE_AZURE.md`.
+GitHub Actions (`.github/workflows/imagen.yml`) runs the tests and publishes the image to `ghcr.io` on every push to `main`/`master`. Run a **single replica**: SQLite on a network volume supports only one writer. Step-by-step guide for Azure Container Apps (in Spanish): `docs/DESPLIEGUE_AZURE.md`.
 
 ## Development
 

@@ -1,0 +1,38 @@
+# Construye la imagen Docker y la publica en ghcr.io (GitHub Container Registry).
+# Azure Container Apps la descarga de ahí: en la suscripción de estudiante de Raúl
+# no se puede construir dentro de Azure (ACR Tasks bloqueado). Ver docs/DESPLIEGUE_AZURE.md.
+name: Imagen Docker
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Si los tests o el lint fallan, no se publica la imagen.
+      - name: Tests y lint
+        run: |
+          pip install uv==0.12.23
+          uv sync --locked
+          uv run ruff check .
+          uv run pytest -q
+
+      - name: Construir y publicar
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"   # ghcr exige minúsculas
+          TAG="${GITHUB_SHA::7}"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
+          docker push --all-tags "$IMAGE"
+          echo "Imagen publicada: $IMAGE:$TAG" >> "$GITHUB_STEP_SUMMARY"
