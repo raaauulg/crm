@@ -6,8 +6,8 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from crm.models import Company, Interaction, Invoice, Phase
-from crm.services.clients import InvoiceStatus, invoice_status, mrr_cents
+from crm.models import Company, Contract, Interaction, Invoice, Phase
+from crm.services.clients import InvoiceStatus, contract_is_active, invoice_status, mrr_cents
 from crm.services.clock import today
 
 # Fases que cuentan para "€ en juego": de identificado a propuesta enviada.
@@ -89,6 +89,33 @@ def pipeline_summary(session: Session, on: date | None = None) -> PipelineSummar
         interactions_this_week=int(interactions or 0),
         total_potential=sum(counts.values()),
     )
+
+
+def monthly_revenue(
+    session: Session, months: int = 12, on: date | None = None
+) -> list[MonthlyRevenue]:
+    """Últimos `months` meses (el actual incluido): facturado (bases) y MRR a fin de mes.
+
+    Para el mes en curso, el MRR es el de hoy.
+    """
+    on = on or today()
+    contracts = list(session.scalars(select(Contract)))
+    invoices = list(session.scalars(select(Invoice)))
+    series: list[MonthlyRevenue] = []
+    for back in range(months - 1, -1, -1):
+        total = on.year * 12 + (on.month - 1) - back
+        year, month = divmod(total, 12)
+        month += 1
+        next_month_start = date(year + month // 12, month % 12 + 1, 1)
+        month_end = min(next_month_start - timedelta(days=1), on)
+        invoiced = sum(
+            i.base_cents
+            for i in invoices
+            if (i.issue_date.year, i.issue_date.month) == (year, month)
+        )
+        mrr = sum(c.monthly_fee_cents for c in contracts if contract_is_active(c, month_end))
+        series.append(MonthlyRevenue(f"{year}-{month:02d}", invoiced, mrr))
+    return series
 
 
 def clients_summary(session: Session, on: date | None = None) -> ClientsSummary:

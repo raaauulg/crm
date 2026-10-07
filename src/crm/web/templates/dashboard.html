@@ -23,24 +23,40 @@
 
   <div class="mt-5 grid gap-5 lg:grid-cols-5">
     <section class="lg:col-span-2 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Empresas por fase</h2>
-      {% set max_count = (p.count_by_phase.values()|max) or 1 %}
-      <ul class="space-y-2">
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Embudo por fase</h2>
+      {% set funnel = p.count_by_phase.items()|rejectattr(0, "equalto", "7-Perdido")|list %}
+      <div class="relative h-56"><canvas id="funnel-chart" role="img" aria-label="Empresas abiertas por fase"></canvas></div>
+      {# Vista en tabla (accesible y con enlaces a la tabla filtrada). #}
+      <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
         {% for phase, count in p.count_by_phase.items() %}
-          <li>
-            <a href="/empresas?fase={{ phase|urlencode }}" class="block group">
-              <div class="flex justify-between text-sm">
-                <span class="text-slate-700 group-hover:text-indigo-700">{{ phase }}</span>
-                <span class="tabular-nums font-medium">{{ count }}</span>
-              </div>
-              <div class="mt-1 h-1.5 rounded-full bg-slate-100">
-                <div class="h-1.5 rounded-full bg-indigo-500" style="width: {{ (count / max_count * 100)|round|int }}%"></div>
-              </div>
-            </a>
+          <li class="flex justify-between">
+            <a href="/empresas?fase={{ phase|urlencode }}" class="text-slate-600 hover:text-indigo-700">{{ phase }}</a>
+            <span class="tabular-nums font-medium">{{ count }}</span>
           </li>
         {% endfor %}
       </ul>
-    </section>
+      <script>
+        (function () {
+          const el = document.getElementById("funnel-chart");
+          if (!el || !window.Chart) return;
+          const rows = {{ funnel|tojson }};
+          new Chart(el, {
+            type: "bar",
+            data: {
+              labels: rows.map(r => r[0]),
+              datasets: [{ data: rows.map(r => r[1]), backgroundColor: "#6366f1", borderRadius: 4, borderSkipped: "start", barPercentage: 0.7 }]
+            },
+            options: {
+              indexAxis: "y", maintainAspectRatio: false, animation: false,
+              plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.x} empresas` } } },
+              scales: {
+                x: { beginAtZero: true, ticks: { precision: 0, color: "#64748b" }, grid: { color: "#f1f5f9" }, border: { display: false } },
+                y: { ticks: { color: "#475569" }, grid: { display: false }, border: { display: false } }
+              }
+            }
+          });
+        })();
+      </script>    </section>
 
     <section class="lg:col-span-3 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
       <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Seguimientos</h2>
@@ -79,6 +95,50 @@
     {{ ui.kpi("Vencido", k.overdue_cents|euros, "IVA incluido", "text-rose-600" if k.overdue_cents else "") }}
   </div>
 
+  <div class="mt-5 grid gap-5 lg:grid-cols-2">
+    {% for chart_id, title, key, kind in [("mrr-chart", "MRR a fin de mes", "mrr_cents", "line"), ("revenue-chart", "Facturado por mes (base)", "invoiced_cents", "bar")] %}
+      <section class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+        <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{{ title }}</h2>
+        <div class="relative h-56"><canvas id="{{ chart_id }}" role="img" aria-label="{{ title }}, últimos 12 meses"></canvas></div>
+      </section>
+    {% endfor %}
+  </div>
+  <details class="mt-3 text-sm text-slate-600">
+    <summary class="cursor-pointer text-slate-500">Ver los datos en tabla</summary>
+    <table class="mt-2 min-w-full text-sm">
+      <thead class="text-slate-500"><tr><th class="text-left font-medium">Mes</th><th class="text-right font-medium">MRR</th><th class="text-right font-medium">Facturado</th></tr></thead>
+      <tbody>{% for m in monthly %}<tr><td>{{ m.month }}</td><td class="text-right tabular-nums">{{ m.mrr_cents|euros }}</td><td class="text-right tabular-nums">{{ m.invoiced_cents|euros }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </details>
+  <script>
+    (function () {
+      if (!window.Chart) return;
+      const months = {{ monthly|map(attribute="month")|list|tojson }};
+      const fmt = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+      const label = m => { const [y, mo] = m.split("-"); return new Date(+y, +mo - 1, 1).toLocaleDateString("es-ES", { month: "short" }); };
+      const common = {
+        maintainAspectRatio: false, animation: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => " " + fmt.format(c.parsed.y) } } },
+        scales: {
+          x: { ticks: { color: "#64748b" }, grid: { display: false }, border: { display: false } },
+          y: { beginAtZero: true, ticks: { color: "#64748b", callback: v => fmt.format(v) }, grid: { color: "#f1f5f9" }, border: { display: false } }
+        }
+      };
+      const series = {
+        "mrr-chart": { type: "line", data: {{ monthly|map(attribute="mrr_cents")|list|tojson }} },
+        "revenue-chart": { type: "bar", data: {{ monthly|map(attribute="invoiced_cents")|list|tojson }} }
+      };
+      for (const [id, s] of Object.entries(series)) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const dataset = s.type === "line"
+          ? { data: s.data.map(c => c / 100), borderColor: "#4f46e5", backgroundColor: "#4f46e5", borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0.25 }
+          : { data: s.data.map(c => c / 100), backgroundColor: "#6366f1", borderRadius: 4, borderSkipped: "start", barPercentage: 0.7 };
+        new Chart(el, { type: s.type, data: { labels: months.map(label), datasets: [dataset] }, options: common });
+      }
+    })();
+  </script>
   <section class="mt-5 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
     <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Facturas vencidas</h2>
     {% if k.overdue_invoices %}

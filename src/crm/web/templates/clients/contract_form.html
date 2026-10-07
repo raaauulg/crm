@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}{{ "Convertir en cliente" if converting else "Nuevo contrato" }}{% endblock %}
+{% block content %}
+{% macro v(name, default_key, money=false) -%}
+  {%- if form and name in form -%}{{ form.get(name) }}
+  {%- else -%}
+    {%- set raw = defaults.get(default_key) -%}
+    {%- if raw is none -%}
+    {%- elif money -%}{{ raw|euros_input }}
+    {%- elif raw is not string and raw.isoformat is defined -%}{{ raw.isoformat() }}
+    {%- else -%}{{ raw }}{%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+{% set input_cls = "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" %}
+<a href="/empresas/{{ company.id }}" class="text-sm text-slate-500 hover:text-indigo-700">← {{ company.name }}</a>
+<h1 class="mt-1 mb-2 text-2xl font-semibold tracking-tight">{{ "Convertir en cliente" if converting else "Nuevo contrato" }}</h1>
+{% if converting %}
+  <p class="mb-5 text-sm text-slate-600">La empresa pasará a <strong>6-Ganado</strong> y se creará su primer contrato. Su cuota contará en el MRR desde la fecha de inicio.</p>
+{% endif %}
+{% if error %}
+  <div class="mb-4 rounded-lg bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-800">{{ error }}</div>
+{% endif %}
+<form method="post" class="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm grid gap-4 sm:grid-cols-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% set selected = v("service_id", "service_id")|string %}
+  <label class="block sm:col-span-2">
+    <span class="text-sm text-slate-600">Servicio *</span>
+    <select name="service_id" required class="{{ input_cls }}">
+      <option value="">— Elige —</option>
+      {% for s in services %}
+        <option value="{{ s.id }}" {{ 'selected' if selected == s.id|string }}>{{ s.name }} ({{ s.setup_price_cents|euros(false) }} + {{ s.monthly_fee_cents|euros(false) }}/mes)</option>
+      {% endfor %}
+    </select>
+  </label>
+  {{ ui.field("setup_price", "Implantación pactada (€)", v("setup_price", "setup_price_cents", money=true), required=true) }}
+  {{ ui.field("monthly_fee", "Cuota mensual pactada (€)", v("monthly_fee", "monthly_fee_cents", money=true), required=true) }}
+  {{ ui.field("start_date", "Fecha de inicio", v("start_date", "start_date"), type="date", required=true) }}
+  {{ ui.field("commitment_months", "Permanencia (meses)", v("commitment_months", "commitment_months"), type="number") }}
+  {{ ui.field("end_date", "Fecha de fin (opcional)", v("end_date", "end_date"), type="date") }}
+  <div class="sm:col-span-2 flex gap-2">
+    <button class="rounded-lg {{ 'bg-emerald-600 hover:bg-emerald-700' if converting else 'bg-indigo-600 hover:bg-indigo-700' }} px-5 py-2.5 text-sm font-medium text-white">{{ "Convertir en cliente" if converting else "Guardar contrato" }}</button>
+    <a href="/empresas/{{ company.id }}" class="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm hover:bg-slate-50">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

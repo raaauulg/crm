@@ -8,6 +8,7 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from crm.config import get_settings
+from crm.text import fold
 
 
 def make_engine(url: str) -> Engine:
@@ -19,6 +20,8 @@ def make_engine(url: str) -> Engine:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
+        # Búsqueda sin tildes: el LIKE de SQLite solo ignora mayúsculas en ASCII.
+        dbapi_connection.create_function("crm_fold", 1, fold, deterministic=True)
 
     return engine
 

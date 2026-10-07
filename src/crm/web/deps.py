@@ -28,6 +28,9 @@ register_filters(templates.env.filters)
 templates.env.globals["nav_items"] = [
     ("/", "Inicio", "M3 12l9-8 9 8M5 10v10h14V10"),
     ("/empresas", "Empresas", "M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16M9 7h2m-2 4h2m-2 4h2M2 21h20"),
+    ("/kanban", "Kanban", "M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v6h-4z"),
+    ("/facturas", "Facturas", "M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"),
+    ("/servicios", "Servicios", "M4 6h16M4 12h16M4 18h10"),
 ]
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -120,14 +123,17 @@ def redirect(request: Request, url: str, full_reload: bool = False) -> Response:
 
 def safe_path(target: str, default: str = "/") -> str:
     """Solo rutas internas: evita redirecciones abiertas a otros dominios."""
-    if target.startswith("/") and not target.startswith("//") and "\\" not in target:
+    has_control = any(ord(c) < 0x20 or ord(c) == 0x7F for c in target)
+    is_internal = target.startswith("/") and not target.startswith("//") and "\\" not in target
+    if is_internal and not has_control:
         return target
     return default
 
 
 def login_redirect(request: Request) -> Response:
-    target = request.url.path
-    if request.url.query:
+    # Solo se vuelve a páginas (GET): tras entrar, un POST repetido como GET daría 405.
+    target = request.url.path if request.method == "GET" else "/"
+    if request.method == "GET" and request.url.query:
         target += "?" + request.url.query
     url = f"/login?next={quote(target)}"
     if request.headers.get("HX-Request"):

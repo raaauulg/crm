@@ -101,7 +101,12 @@ def company_list(request: Request, session: Session = Depends(get_session)) -> R
 
 
 def _form_context(session: Session, **extra: Any) -> dict[str, Any]:
-    return {"services": catalog.list_services(session, only_active=True), "error": None, **extra}
+    services = catalog.list_services(session, only_active=True)
+    company = extra.get("company")
+    # Si el servicio de interés se desactivó, se sigue ofreciendo para no perderlo al guardar.
+    if company is not None and company.service is not None and company.service not in services:
+        services.append(company.service)
+    return {"services": services, "error": None, **extra}
 
 
 @router.get("/nueva")

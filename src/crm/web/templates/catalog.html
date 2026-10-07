@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Servicios{% endblock %}
+{% block content %}
+{% set input_cls = "w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" %}
+<h1 class="mb-2 text-2xl font-semibold tracking-tight">Catálogo de servicios</h1>
+<p class="mb-5 text-sm text-slate-500">Precios de referencia. Al convertir una empresa en cliente se proponen estos importes y se pueden ajustar en el contrato. Desactiva un servicio para que no salga en los desplegables (los contratos que lo usan no cambian).</p>
+
+<div class="space-y-3">
+  {% for s in services %}
+    <form method="post" action="/servicios/{{ s.id }}"
+          class="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto_auto] sm:items-center {{ 'opacity-60' if not s.active }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input name="name" value="{{ s.name }}" aria-label="Nombre" class="{{ input_cls }} font-medium">
+      <label class="flex items-center gap-1 text-xs text-slate-500">Impl.
+        <input name="setup_price" value="{{ s.setup_price_cents|euros_input }}" inputmode="decimal" class="{{ input_cls }} text-right"> €</label>
+      <label class="flex items-center gap-1 text-xs text-slate-500">Cuota
+        <input name="monthly_fee" value="{{ s.monthly_fee_cents|euros_input }}" inputmode="decimal" class="{{ input_cls }} text-right"> €/mes</label>
+      <label class="flex items-center gap-1 text-sm text-slate-600"><input type="checkbox" name="active" {{ 'checked' if s.active }} class="h-4 w-4"> Activo</label>
+      <button class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50">Guardar</button>
+    </form>
+  {% endfor %}
+
+  <form method="post" action="/servicios"
+        class="rounded-2xl border-2 border-dashed border-slate-300 p-4 grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-center">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input name="name" placeholder="Nuevo servicio" required class="{{ input_cls }}">
+    <input name="setup_price" placeholder="Implantación €" inputmode="decimal" class="{{ input_cls }}">
+    <input name="monthly_fee" placeholder="Cuota €/mes" inputmode="decimal" class="{{ input_cls }}">
+    <button class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">Añadir</button>
+  </form>
+</div>
+{% endblock %}

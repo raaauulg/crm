@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Kanban{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-semibold tracking-tight">Kanban de potenciales</h1>
+  <a href="/empresas/nueva" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ Nueva empresa</a>
+</div>
+<p class="mb-4 text-sm text-slate-500">Mueve las tarjetas con las flechas. Desde «Propuesta enviada», «Ganar» abre el alta del contrato. Las perdidas están en <a class="text-indigo-600" href="/empresas?fase=7-Perdido">Empresas</a>.</p>
+
+{# En móvil las columnas se desplazan en horizontal dentro de este contenedor; la página no. #}
+<div class="-mx-4 px-4 overflow-x-auto pb-4 md:mx-0 md:px-0">
+  <div class="flex gap-3 min-w-max" id="kanban">
+    {% for phase, cards in board.items() %}
+      <section class="w-64 shrink-0 rounded-2xl bg-slate-100 p-2" data-phase="{{ phase }}">
+        <header class="px-2 py-1.5 flex items-baseline justify-between">
+          <h2 class="text-sm font-semibold text-slate-700">{{ phase }}</h2>
+          <span class="text-xs text-slate-500">{{ cards|length }}{% if totals[phase] %} · {{ totals[phase]|euros(false) }}{% endif %}</span>
+        </header>
+        <div class="space-y-2 min-h-12 kanban-column" data-phase="{{ phase }}">
+          {% for c in cards %}
+            {% set prev, next = neighbours[c.id] %}
+            <article class="rounded-xl bg-white border border-slate-200 p-3 shadow-sm" data-id="{{ c.id }}">
+              <a href="/empresas/{{ c.id }}" class="block font-medium leading-snug hover:text-indigo-700">{{ c.name }}</a>
+              <div class="mt-0.5 text-xs text-slate-500">{{ [c.municipality, c.sector]|select|join(" · ") }}</div>
+              {% if c.estimated_value_cents %}<div class="mt-1 text-sm tabular-nums">{{ c.estimated_value_cents|euros(false) }}</div>{% endif %}
+              {% if c.next_step_date %}
+                <div class="mt-1 text-xs {{ 'text-rose-600 font-medium' if c.next_step_date < today else 'text-slate-500' }}">
+                  {{ c.next_step_date|fecha }} · {{ c.next_step|truncate(30) }}
+                </div>
+              {% endif %}
+              <div class="mt-2 flex items-center gap-1">
+                {% for target, label in [(prev, "←"), (next, "→")] %}
+                  {% if target %}
+                    <form method="post" action="/empresas/{{ c.id }}/fase">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <input type="hidden" name="phase" value="{{ target.value }}">
+                      <input type="hidden" name="back" value="/kanban">
+                      <button title="Mover a {{ target.value }}" class="rounded-md border border-slate-200 px-2 py-0.5 text-sm text-slate-600 hover:bg-slate-50">{{ label }}</button>
+                    </form>
+                  {% endif %}
+                {% endfor %}
+                {% if phase == "5-Propuesta enviada" %}
+                  <a href="/empresas/{{ c.id }}/convertir" class="rounded-md bg-emerald-600 px-2 py-0.5 text-sm text-white hover:bg-emerald-700">Ganar</a>
+                {% endif %}
+                <form method="post" action="/empresas/{{ c.id }}/fase" class="ml-auto"
+                      onsubmit="return confirm('¿Marcar esta empresa como perdida?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="phase" value="7-Perdido">
+                  <input type="hidden" name="back" value="/kanban">
+                  <button title="Marcar como perdida" class="rounded-md px-1.5 py-0.5 text-sm text-slate-400 hover:text-rose-600">✕</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

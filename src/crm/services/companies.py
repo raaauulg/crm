@@ -1,15 +1,16 @@
 """Empresas, contactos, interacciones, fases y próximos pasos."""
 
-import unicodedata
 from datetime import date
 
 from pydantic import Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from crm.models import Channel, Company, Contact, ContractStatus, Interaction, Phase
+from crm.models import Channel, Company, Contact, Interaction, Phase, Service
+from crm.services.clock import today
 from crm.services.errors import NotFoundError, ServiceError
 from crm.services.validation import InputModel
+from crm.text import fold
 
 POTENTIAL_PHASES: tuple[Phase, ...] = tuple(p for p in Phase if p is not Phase.WON)
 # Fases a las que se puede mover una empresa con "cambiar fase". `0-Lead` es solo para
@@ -63,10 +64,12 @@ class InteractionInput(InputModel):
 
 def normalize_name(name: str) -> str:
     """Clave para detectar duplicados: sin tildes, minúsculas, sin signos, espacios simples."""
-    decomposed = unicodedata.normalize("NFKD", name)
-    without_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
-    alnum = "".join(c if c.isalnum() else " " for c in without_accents.lower())
-    return " ".join(alnum.split())
+    return fold(name)
+
+
+def _check_service(session: Session, data: CompanyInput) -> None:
+    if data.service_id is not None and session.get(Service, data.service_id) is None:
+        raise ServiceError(f"No existe el servicio {data.service_id}.")
 
 
 def find_by_normalized_name(session: Session, name: str) -> Company | None:
@@ -92,6 +95,7 @@ def create_company(
     existing = find_by_normalized_name(session, data.name)
     if existing is not None:
         raise ServiceError(f"Ya existe una empresa con ese nombre: {existing.name!r}.")
+    _check_service(session, data)
     company = Company(**data.model_dump(), phase=phase.value, created_by=actor, updated_by=actor)
     session.add(company)
     session.commit()
@@ -104,6 +108,7 @@ def update_company(session: Session, company_id: int, data: CompanyInput, actor:
     existing = find_by_normalized_name(session, data.name)
     if existing is not None and existing.id != company.id:
         raise ServiceError(f"Ya existe otra empresa con ese nombre: {existing.name!r}.")
+    _check_service(session, data)
     for field, value in data.model_dump().items():
         setattr(company, field, value)
     company.updated_by = actor
@@ -123,14 +128,21 @@ def search_companies(
 ) -> list[Company]:
     """Búsqueda para la tabla de empresas. `group` = "potenciales" | "clientes" | ""."""
     query = select(Company)
-    if text.strip():
-        like = f"%{text.strip()}%"
+    folded = fold(text)
+    if folded:
+        # `fold` quita tildes y signos (también los comodines % y _ del LIKE).
+        like = f"%{folded}%"
         query = query.where(
             or_(
-                Company.name.ilike(like),
-                Company.notes.ilike(like),
-                Company.sector.ilike(like),
-                Company.municipality.ilike(like),
+                *(
+                    func.crm_fold(column).like(like)
+                    for column in (
+                        Company.name,
+                        Company.notes,
+                        Company.sector,
+                        Company.municipality,
+                    )
+                )
             )
         )
     if phase:
@@ -169,11 +181,12 @@ def change_phase(session: Session, company_id: int, new_phase: str, actor: str) 
         raise ServiceError("0-Lead es solo para empresas importadas sin revisar.")
     if company.phase == target.value:
         raise ServiceError(f"La empresa ya está en {target.value}.")
+    on = today()
     if company.phase == Phase.WON.value and any(
-        c.status == ContractStatus.ACTIVE.value for c in company.contracts
+        c.end_date is None or c.end_date >= on for c in company.contracts
     ):
         raise ServiceError(
-            "La empresa tiene contratos activos: cancélalos antes de cambiar la fase."
+            "La empresa tiene contratos vigentes o con baja futura: cambia la fase cuando terminen."
         )
     company.phase = target.value
     company.updated_by = actor
@@ -243,6 +256,44 @@ def add_interaction(
     session.add(interaction)
     session.commit()
     return interaction
+
+
+KANBAN_PHASES: tuple[Phase, ...] = (
+    Phase.LEAD,
+    Phase.IDENTIFIED,
+    Phase.CONTACTED,
+    Phase.MEETING,
+    Phase.DIAGNOSIS,
+    Phase.PROPOSAL_SENT,
+)
+
+
+def kanban_board(session: Session) -> dict[str, list[Company]]:
+    """Potenciales abiertos agrupados por fase (de 0-Lead a 5-Propuesta enviada)."""
+    board: dict[str, list[Company]] = {p.value: [] for p in KANBAN_PHASES}
+    query = (
+        select(Company)
+        .where(Company.phase.in_(board.keys()))
+        .order_by(Company.next_step_date.asc().nulls_last(), Company.name)
+    )
+    for company in session.scalars(query):
+        board[company.phase].append(company)
+    return board
+
+
+def neighbour_phases(phase: str) -> tuple[Phase | None, Phase | None]:
+    """Fase anterior y siguiente para los botones del kanban (entre 1 y 5).
+
+    Desde 0-Lead se avanza a 1; desde 5 no hay siguiente (se usa "Convertir en cliente").
+    """
+    order = list(KANBAN_PHASES)
+    current = Phase(phase)
+    if current not in order:
+        return None, None
+    index = order.index(current)
+    previous = order[index - 1] if index > 1 else None
+    following = order[index + 1] if index + 1 < len(order) else None
+    return previous, following
 
 
 def upcoming_steps(session: Session, until: date) -> list[Company]:

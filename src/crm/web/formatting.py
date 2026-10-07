@@ -42,8 +42,9 @@ def euros_input(cents: int | None) -> str:
     """Valor para un <input>: '1700,50' (sin miles ni símbolo, fácil de editar)."""
     if cents is None:
         return ""
-    whole, rest = divmod(cents, 100)
-    return f"{whole},{rest:02d}" if rest else str(whole)
+    sign = "-" if cents < 0 else ""
+    whole, rest = divmod(abs(cents), 100)
+    return f"{sign}{whole},{rest:02d}" if rest else f"{sign}{whole}"
 
 
 def spanish_date(value: date | datetime | None) -> str:

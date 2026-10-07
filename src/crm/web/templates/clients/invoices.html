@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui %}
+{% block title %}Facturas{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+  <h1 class="text-2xl font-semibold tracking-tight">Facturas</h1>
+  <div class="inline-flex flex-wrap rounded-xl bg-slate-200/70 p-1 text-sm">
+    <a href="/facturas" class="rounded-lg px-3 py-1.5 font-medium {{ 'bg-white shadow-sm' if not estado else 'text-slate-600' }}">Todas</a>
+    {% for s in statuses %}
+      <a href="/facturas?estado={{ s.value }}" class="rounded-lg px-3 py-1.5 font-medium {{ 'bg-white shadow-sm' if estado == s.value else 'text-slate-600' }}">{{ s.value|capitalize }}</a>
+    {% endfor %}
+  </div>
+</div>
+<p class="mb-4 text-sm text-slate-500">Registro de facturas emitidas en el programa de facturación. Para añadir una, entra en la ficha del cliente.</p>
+<div class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead class="bg-slate-50 text-slate-500"><tr>
+      <th class="px-3 py-2 text-left font-medium">Cliente</th>
+      <th class="px-3 py-2 text-left font-medium hidden sm:table-cell">Número</th>
+      <th class="px-3 py-2 text-left font-medium hidden md:table-cell">Emisión</th>
+      <th class="px-3 py-2 text-left font-medium">Vence</th>
+      <th class="px-3 py-2 text-right font-medium">Total</th>
+      <th class="px-3 py-2 text-left font-medium">Estado</th>
+      <th></th>
+    </tr></thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for inv, status in rows %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-2"><a href="/empresas/{{ inv.company_id }}" class="font-medium hover:text-indigo-700">{{ inv.company.name }}</a></td>
+          <td class="px-3 py-2 hidden sm:table-cell">{{ inv.number }}</td>
+          <td class="px-3 py-2 hidden md:table-cell tabular-nums">{{ inv.issue_date|fecha }}</td>
+          <td class="px-3 py-2 tabular-nums">{{ inv.due_date|fecha }}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{{ inv.total_cents|euros }}</td>
+          <td class="px-3 py-2">{{ ui.status_badge(status.value) }}</td>
+          <td class="px-3 py-2 text-right">
+            {% if not inv.paid_date %}
+              <form method="post" action="/facturas/{{ inv.id }}/cobro">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="back" value="/facturas">
+                <button class="rounded-lg border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50">Cobrada hoy</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="px-3 py-8 text-center text-slate-500">No hay facturas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

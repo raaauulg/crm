@@ -50,6 +50,8 @@ class InvoiceInput(InputModel):
     def _due_after_issue(self) -> "InvoiceInput":
         if self.due_date < self.issue_date:
             raise ValueError("el vencimiento no puede ser anterior a la emisión")
+        if self.paid_date is not None and self.paid_date < self.issue_date:
+            raise ValueError("el cobro no puede ser anterior a la emisión")
         return self
 
 
@@ -57,20 +59,19 @@ class InvoiceInput(InputModel):
 
 
 def contract_is_active(contract: Contract, on: date) -> bool:
-    """Activo = estado `activo`, ya empezado y sin terminar (la fecha de fin cuenta)."""
-    return (
-        contract.status == ContractStatus.ACTIVE.value
-        and contract.start_date <= on
-        and (contract.end_date is None or contract.end_date >= on)
-    )
+    """Activo en una fecha = ya empezado y sin terminar (el día de fin aún cuenta).
+
+    Solo mandan las fechas: una baja registrada hoy con fin el 31/12 sigue sumando al MRR
+    hasta el 31/12, y el histórico de meses pasados no cambia al cancelar. El estado
+    `cancelado` solo indica que la baja ya está registrada (y siempre lleva fecha de fin).
+    """
+    return contract.start_date <= on and (contract.end_date is None or contract.end_date >= on)
 
 
 def mrr_cents(session: Session, on: date | None = None) -> int:
     """MRR: suma de las cuotas mensuales de los contratos activos en la fecha (hoy por defecto)."""
     on = on or today()
-    contracts = session.scalars(
-        select(Contract).where(Contract.status == ContractStatus.ACTIVE.value)
-    )
+    contracts = session.scalars(select(Contract))
     return sum(c.monthly_fee_cents for c in contracts if contract_is_active(c, on))
 
 
@@ -111,6 +112,20 @@ def convert_to_client(
     return contract
 
 
+def get_contract(session: Session, contract_id: int) -> Contract:
+    contract = session.get(Contract, contract_id)
+    if contract is None:
+        raise NotFoundError(f"No existe el contrato {contract_id}.")
+    return contract
+
+
+def get_invoice(session: Session, invoice_id: int) -> Invoice:
+    invoice = session.get(Invoice, invoice_id)
+    if invoice is None:
+        raise NotFoundError(f"No existe la factura {invoice_id}.")
+    return invoice
+
+
 def cancel_contract(session: Session, contract_id: int, end_date: date, actor: str) -> Contract:
     contract = session.get(Contract, contract_id)
     if contract is None:
@@ -142,6 +157,8 @@ def invoice_status(invoice: Invoice, on: date | None = None) -> InvoiceStatus:
 
 def register_invoice(session: Session, company_id: int, data: InvoiceInput, actor: str) -> Invoice:
     company = get_company(session, company_id)
+    if data.paid_date is not None and data.paid_date > today():
+        raise ServiceError("La fecha de cobro no puede ser futura.")
     if session.scalar(select(Invoice).where(Invoice.number == data.number)):
         raise ServiceError(f"Ya hay una factura con el número {data.number!r}.")
     if data.contract_id is not None:
@@ -166,6 +183,8 @@ def register_payment(session: Session, invoice_id: int, paid_on: date, actor: st
         raise NotFoundError(f"No existe la factura {invoice_id}.")
     if invoice.paid_date is not None:
         raise ServiceError("La factura ya está cobrada.")
+    if paid_on > today():
+        raise ServiceError("La fecha de cobro no puede ser futura.")
     if paid_on < invoice.issue_date:
         raise ServiceError("La fecha de cobro no puede ser anterior a la de emisión.")
     invoice.paid_date = paid_on

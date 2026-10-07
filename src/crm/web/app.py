@@ -14,7 +14,7 @@ from crm.db import default_session_factory
 from crm.services.catalog import ensure_default_catalog
 from crm.services.errors import NotFoundError
 from crm.web.deps import CsrfError, LoginRequired, login_redirect
-from crm.web.routes import auth, companies, dashboard
+from crm.web.routes import auth, catalog, clients, companies, dashboard, kanban
 
 logger = logging.getLogger(__name__)
 
@@ -74,4 +74,7 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
+    app.include_router(clients.router)
+    app.include_router(kanban.router)
+    app.include_router(catalog.router)
     return app

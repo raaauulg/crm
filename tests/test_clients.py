@@ -84,7 +84,7 @@ def test_cancelled_contract_leaves_mrr(session: Session) -> None:
 
 def test_client_with_active_contract_cannot_change_phase(session: Session) -> None:
     company_id = new_client(session)
-    with pytest.raises(ServiceError, match="contratos activos"):
+    with pytest.raises(ServiceError, match="contratos vigentes"):
         companies.change_phase(session, company_id, Phase.LOST.value, "raul")
 
 

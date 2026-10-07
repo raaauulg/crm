@@ -7,6 +7,7 @@
   {# Deuda técnica: Tailwind, HTMX y Chart.js por CDN. En producción, servirlos en local. #}
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   {% block head %}{% endblock %}
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased"
@@ -71,6 +72,14 @@
     {% endfor %}
   </nav>
 </div>
+<script>
+  /* HTMX no pinta las respuestas 4xx/5xx: avisa en vez de "no hacer nada". */
+  document.body.addEventListener("htmx:responseError", function (event) {
+    const xhr = event.detail.xhr;
+    const isText = (xhr.getResponseHeader("Content-Type") || "").startsWith("text/plain");
+    window.alert(isText ? xhr.responseText : "Error " + xhr.status + ". Mira el log del servidor.");
+  });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

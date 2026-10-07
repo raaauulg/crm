@@ -391,7 +391,7 @@ def load_demo(session: Session, force: bool = False, on: date | None = None) -> 
             next_step_date=(
                 on + timedelta(days=demo.next_in_days) if demo.next_in_days is not None else None
             ),
-            phone=f"975 000 {index:03d}",
+            phone=f"600 000 1{index:02d}",
             created_by=DEMO_ACTOR,
             updated_by=DEMO_ACTOR,
         )
