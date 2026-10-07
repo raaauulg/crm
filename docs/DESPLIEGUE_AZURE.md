@@ -95,21 +95,29 @@ Guarda `$MCP_TOKEN` en tu gestor de contraseñas: lo necesitas en el paso 8.
 
 ## 5. Construir y crear la app
 
-```powershell
-az containerapp up --name $APP --resource-group $RG --environment $ENV_NAME `
-  --location $LOC --source . --ingress external --target-port 8000
-```
-
-Este comando crea un **Azure Container Registry** (ACR), construye la imagen allí con el `Dockerfile`, la sube y crea la app. Tarda unos minutos.
-
-Después, los secretos, las variables que los usan y el límite de réplicas:
+Primero, un **Azure Container Registry** (ACR) donde guardar la imagen, y la imagen construida en Azure con el `Dockerfile`:
 
 ```powershell
-az containerapp secret set -n $APP -g $RG --secrets "secret-key=$SECRET_KEY" "mcp-token=$MCP_TOKEN"
-az containerapp update -n $APP -g $RG `
-  --set-env-vars "SECRET_KEY=secretref:secret-key" "CRM_MCP_TOKEN=secretref:mcp-token" `
-  --min-replicas 0 --max-replicas 1
+$ACR = "crmacr$(Get-Random -Maximum 99999)"     # único en Azure; apúntalo
+az acr create --resource-group $RG --name $ACR --location $LOC --sku Basic --admin-enabled true
+az acr build --registry $ACR --image crm:v1 .
 ```
+
+Después, la app con su imagen, los secretos y como máximo 1 réplica, todo en un solo comando:
+
+```powershell
+az containerapp create --name $APP --resource-group $RG --environment $ENV_NAME `
+  --image "$ACR.azurecr.io/crm:v1" --registry-server "$ACR.azurecr.io" `
+  --target-port 8000 --ingress external --min-replicas 0 --max-replicas 1 `
+  --secrets "secret-key=$SECRET_KEY" "mcp-token=$MCP_TOKEN" `
+  --env-vars "SECRET_KEY=secretref:secret-key" "CRM_MCP_TOKEN=secretref:mcp-token"
+```
+
+La CLI toma sola el usuario y la contraseña del registro (por eso `--admin-enabled true`).
+
+> No uses `az containerapp up --source .`: con las versiones recientes de la CLI construye con *Cloud Build* (preview) y falla con `ResourceNotFound` si la app todavía no existe.
+>
+> Si `az acr build` falla con un error de *Tasks* no permitidas (pasa en algunas suscripciones de estudiante o de prueba), pásame el mensaje: la alternativa es construir la imagen en GitHub Actions.
 
 ## 6. Montar el volumen `/data`
 
@@ -193,10 +201,10 @@ claude mcp list
 Lo mismo vale para cualquier `az containerapp update` cuando ya tienes datos.
 
 ```powershell
-$ACR = az acr list -g $RG --query "[0].loginServer" -o tsv
+$ACR = az acr list -g $RG --query "[0].name" -o tsv
 $TAG = Get-Date -Format "yyyyMMdd-HHmm"
-az acr build --registry $ACR.Split(".")[0] --image "crm:$TAG" .
-az containerapp update -n $APP -g $RG --image "$ACR/crm:$TAG"
+az acr build --registry $ACR --image "crm:$TAG" .
+az containerapp update -n $APP -g $RG --image "$ACR.azurecr.io/crm:$TAG"
 ```
 
 Las migraciones se aplican solas al arrancar (`alembic upgrade head` en el `CMD` del `Dockerfile`).

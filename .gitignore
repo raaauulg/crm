@@ -10,6 +10,7 @@ exports/
 .env
 .env.*
 !.env.example
+secrets.md
 
 # Ajustes locales de Claude Code (rutas propias del PC de Raúl)
 .claude/settings.local.json
