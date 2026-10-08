@@ -2,7 +2,7 @@
 tipo: guia
 area: internos
 proyecto: crm
-actualizado: 2026-10-07
+actualizado: 2026-10-08
 ---
 
 # Despliegue en Azure Container Apps
@@ -211,6 +211,49 @@ claude mcp list
 - El servidor `crm` de `.mcp.json` sigue apuntando a la base de datos de tu PC: úsalo para desarrollo y demo. **La fuente de verdad pasa a ser Azure.**
 - Prueba: en Claude Code, "¿qué seguimientos tengo vencidos en crm-azure?".
 
+## 9. Dominio propio (opcional, DonDominio)
+
+Un subdominio (`crm.tudominio.es`) con certificado HTTPS gratuito que Azure renueva solo. La dirección `*.azurecontainerapps.io` sigue funcionando.
+
+1. Saca los dos valores para el DNS:
+
+```powershell
+$DOMAIN = "crm.tudominio.es"
+az containerapp show -n $APP -g $RG --query properties.configuration.ingress.fqdn -o tsv
+az containerapp show -n $APP -g $RG --query properties.customDomainVerificationId -o tsv
+```
+
+2. En DonDominio, abre el dominio, entra en su **zona DNS** y añade dos registros. En el nombre se pone solo la parte de delante; DonDominio completa el resto.
+
+| Tipo | Nombre | Valor |
+|---|---|---|
+| CNAME | `crm` | el `fqdn` del primer comando |
+| TXT | `asuid.crm` | el identificador del segundo comando |
+
+   - El dominio tiene que usar los **servidores DNS de DonDominio**. Si los delegaste a otro sitio (Cloudflare, por ejemplo), los registros se crean allí, y en Cloudflare con el proxy desactivado (nube gris).
+   - Si la zona tiene un registro **CAA**, añade `0 issue "digicert.com"`.
+   - Comprueba que ya se ven (de minutos a una hora): `Resolve-DnsName crm.tudominio.es` y `Resolve-DnsName asuid.crm.tudominio.es -Type TXT`.
+
+3. Abre antes la web por la dirección de Azure para que haya una réplica viva, y añade el dominio con su certificado:
+
+```powershell
+az containerapp hostname add --hostname $DOMAIN -g $RG -n $APP
+az containerapp hostname bind --hostname $DOMAIN -g $RG -n $APP `
+  --environment $ENV_NAME --validation-method CNAME
+```
+
+   El certificado tarda unos minutos. Si falla por tiempo, sube a `--min-replicas 1`, repite el `bind` y vuelve a `--min-replicas 0`.
+
+4. Cambia el MCP a la dirección nueva:
+
+```powershell
+claude mcp remove crm-azure --scope user
+claude mcp add --transport http --scope user crm-azure "https://$DOMAIN/mcp" `
+  --header "Authorization: Bearer $MCP_TOKEN"
+```
+
+El código no cambia. Solo tendrás que volver a iniciar sesión en la web, porque la cookie es de cada dominio.
+
 ## Actualizar a una versión nueva del código
 
 ⚠️ Al actualizar, Azure arranca el contenedor nuevo **antes** de parar el viejo. Durante unos segundos hay dos procesos sobre `crm.db`, y el nuevo aplica las migraciones. Para no arriesgar la base de datos:
@@ -293,3 +336,4 @@ Borra **también la base de datos**. Descarga antes una copia.
 - [Azure Files en Container Apps (tutorial)](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts-azure-files)
 - [Volúmenes y `mountOptions`](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts)
 - [`az containerapp up`](https://learn.microsoft.com/en-us/azure/container-apps/containerapp-up)
+- [Dominio propio con certificado gratuito](https://learn.microsoft.com/en-us/azure/container-apps/custom-domains-managed-certificates)
