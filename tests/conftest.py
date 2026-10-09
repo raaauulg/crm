@@ -13,10 +13,18 @@ from crm.models import Base
 from crm.services import users
 from crm.services.catalog import ensure_default_catalog
 from crm.web.app import create_app
+from crm.web.routes.auth import _FAILED_ATTEMPTS
 
 TEST_USER = "raul"
 TEST_PASSWORD = "contraseña-de-prueba"
 CSRF_RE = re.compile(r'name="csrf_token" value="([^"]+)"')
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_rate_limiter() -> Iterator[None]:
+    _FAILED_ATTEMPTS.clear()
+    yield
+    _FAILED_ATTEMPTS.clear()
 
 
 @pytest.fixture

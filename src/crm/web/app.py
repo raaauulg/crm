@@ -17,7 +17,7 @@ from crm.services.catalog import ensure_default_catalog
 from crm.services.errors import NotFoundError
 from crm.web.deps import CsrfError, LoginRequired, login_redirect
 from crm.web.mcp_http import MCP_PATH, mcp_route
-from crm.web.routes import auth, catalog, clients, companies, dashboard, kanban
+from crm.web.routes import auth, catalog, clients, companies, dashboard, kanban, oauth
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ def create_app(
         return PlainTextResponse(str(exc), status_code=404)
 
     app.include_router(auth.router)
+    app.include_router(oauth.router)
     app.include_router(dashboard.router)
     app.include_router(companies.router)
     app.include_router(clients.router)
@@ -94,5 +95,5 @@ def create_app(
     if mcp is not None:
         route, _lifespan = mcp
         app.router.routes.append(route)
-        logger.info("MCP por HTTP activo en %s (con token).", MCP_PATH)
+        logger.info("MCP por HTTP activo en %s (con token y OAuth).", MCP_PATH)
     return app

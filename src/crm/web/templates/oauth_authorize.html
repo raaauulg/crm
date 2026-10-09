@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autorizar acceso · CRM</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center px-4">
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
+    <div class="flex items-center gap-2 text-xl font-semibold tracking-tight">
+      <span class="text-indigo-600">●</span> Conectar agente con CRM
+    </div>
+
+    <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-2">
+      <div class="text-sm font-medium text-slate-900">{{ client.client_name }}</div>
+      <div class="text-xs text-slate-500">Solicita acceso al servidor MCP de tu CRM para consultar y gestionar el pipeline comercial.</div>
+    </div>
+
+    <div class="text-xs text-slate-500 space-y-1">
+      <div>Usuario activo: <strong class="text-slate-700">{{ user.username }}</strong></div>
+      <div>Permisos: <span class="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">mcp (lectura y gestión de contactos/fases)</span></div>
+    </div>
+
+    <form method="post" action="/oauth/authorize" class="space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="client_id" value="{{ client.client_id }}">
+      <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+      <input type="hidden" name="state" value="{{ state }}">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+      <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+
+      <div class="flex gap-3">
+        <a href="/" class="flex-1 text-center rounded-lg border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</a>
+        <button type="submit" class="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">Autorizar</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

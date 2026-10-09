@@ -175,3 +175,47 @@ class Invoice(AuditMixin, Base):
 
     company: Mapped[Company] = relationship(back_populates="invoices")
     contract: Mapped[Contract | None] = relationship()
+
+
+class OAuthClient(Base):
+    """Clientes OAuth 2.1 registrados (dinámicamente o preconfigurados)."""
+
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    client_secret_hash: Mapped[str | None] = mapped_column(String(255))
+    client_name: Mapped[str] = mapped_column(String(120))
+    redirect_uris: Mapped[str] = mapped_column(Text)  # JSON list of strings
+    grant_types: Mapped[str] = mapped_column(String(100), default="authorization_code")
+    response_types: Mapped[str] = mapped_column(String(50), default="code")
+    created_at: Mapped[datetime] = mapped_column(default=now)
+
+
+class OAuthAuthorizationCode(Base):
+    """Códigos de autorización temporales emitidos con PKCE."""
+
+    __tablename__ = "oauth_authorization_codes"
+
+    code: Mapped[str] = mapped_column(String(120), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.client_id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    redirect_uri: Mapped[str] = mapped_column(Text)
+    code_challenge: Mapped[str] = mapped_column(String(128))
+    code_challenge_method: Mapped[str] = mapped_column(String(10), default="S256")
+    scope: Mapped[str] = mapped_column(String(100), default="mcp")
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    used_at: Mapped[datetime | None] = mapped_column()
+
+
+class OAuthAccessToken(Base):
+    """Tokens de acceso Bearer emitidos para clientes OAuth."""
+
+    __tablename__ = "oauth_access_tokens"
+
+    token: Mapped[str] = mapped_column(String(120), primary_key=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("oauth_clients.client_id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    scope: Mapped[str] = mapped_column(String(100), default="mcp")
+    created_at: Mapped[datetime] = mapped_column(default=now)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column()
